@@ -1,0 +1,64 @@
+#!/bin/bash
+set -ue
+# For openssl cert generation
+COUNTRY="US"
+STATE="OR"
+LOCALE="Portland"
+COMMON_NAME="swift-proxy.ensemble-test.com"
+
+DEFAULT_ETH=$(ip route  | grep default | awk '{ print $5 }')
+IP=$(ifconfig  $DEFAULT_ETH | grep 'inet addr' | awk '{ print $2 }' | cut -d: -f2)
+
+# TODO: Need to use different addresses for internal swift traffic
+# as this the only security measure in place is network isolation
+PROXY_LOCAL_NET_IP=$IP
+
+PACKAGES="swift swift-proxy memcached"
+
+SWIFT_HASH_FILE="/var/lib/ensemble/swift-hash-path.conf"
+
+# generate the swift hash to be used for salting URLs of objects.
+# TODO: its important this is never lost, find out some way of getting
+# it off the server and into a sys admins INBOX?
+if [[ ! -e $SWIFT_HASH_FILE ]] ; then
+  echo "swift-proxy: Generating a new SWIFT_HASH in $SWIFT_HASH_FILE"
+  echo $(od -t x8 -N 8 -A n </dev/random) >$SWIFT_HASH_FILE
+fi
+
+function set_swift_hash {
+  # TODO: Do this with augeas and put in a utility function for use elsewhere
+  cat >/etc/swift/swift.conf <<EOF
+[swift-hash]
+# random unique string that can never change (DO NOT LOSE)
+swift_hash_path_suffix = `cat $SWIFT_HASH_FILE` 
+EOF
+}
+
+function create_proxy_conf {
+cat >/etc/swift/proxy-server.conf <<EOF
+[DEFAULT]
+cert_file = /etc/swift/cert.crt
+key_file = /etc/swift/cert.key
+bind_port = 8080
+workers = 8
+user = swift
+
+[pipeline:main]
+pipeline = healthcheck cache tempauth proxy-server
+
+[app:proxy-server]
+use = egg:swift#proxy
+allow_account_management = true
+
+[filter:tempauth]
+use = egg:swift#tempauth
+user_system_root = testpass .admin https://$PROXY_LOCAL_NET_IP:8080/v1/AUTH_system
+
+[filter:healthcheck]
+use = egg:swift#healthcheck
+
+[filter:cache]
+use = egg:swift#memcache
+memcache_servers = $PROXY_LOCAL_NET_IP:11211
+EOF
+}

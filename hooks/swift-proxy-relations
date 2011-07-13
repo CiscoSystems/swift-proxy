@@ -1,0 +1,31 @@
+#!/bin/bash
+set -ue
+FORMULA_DIR=$(dirname $0)
+ARG0=${0##*/}
+
+if [[ -e $FORMULA_DIR/swift-proxy-common ]] ; then
+  . $FORMULA_DIR/swift-proxy-common
+else
+  echo "ERROR: Could nto load swift-proxy-common from $FORMULA_DIR"
+fi
+
+function install_hook {
+  apt-get -y install $PACKAGES || exit 1
+  [[ ! -d /etc/swift ]] && mkdir /etc/swift
+  set_swift_hash || exit 1
+  create_proxy_conf
+  if [[ ! -e /etc/swift/cert.crt ]] ; then
+    openssl req -new -x509 -nodes \
+      -out /etc/swift/cert.crt \
+      -keyout /etc/swift/cert.key \
+      -subj "/C=$COUNTRY/ST=$STATE/L=$LOCALE/CN=$COMMON_NAME"
+  fi
+  perl -pi -e "s/-l 127.0.0.1/-l $PROXY_LOCAL_NET_IP/" /etc/memcached.conf
+  service memcached restart
+}
+
+case $ARG0 in
+  "install") install_hook ;;
+  "start"|"stop") exit 0 ;;
+esac
+
