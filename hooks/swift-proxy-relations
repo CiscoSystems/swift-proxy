@@ -1,17 +1,22 @@
 #!/bin/bash
-set -ue
+set -u
 FORMULA_DIR=$(dirname $0)
 ARG0=${0##*/}
 
 if [[ -e $FORMULA_DIR/swift-proxy-common ]] ; then
   . $FORMULA_DIR/swift-proxy-common
 else
-  echo "ERROR: Could nto load swift-proxy-common from $FORMULA_DIR"
+  echo "ERROR: Could not load swift-proxy-common from $FORMULA_DIR"
 fi
 
 function install_hook {
-  apt-get -y install $PACKAGES || exit 1
-  [[ ! -d /etc/swift ]] && mkdir /etc/swift
+  apt-get -y install python-software-properties || exit 1
+  add-apt-repository ppa:swift-core/milestone-proposed || exit 1
+  apt-get update
+  for i in $PACKAGES ; do
+    DEBIAN_FRONTEND=noninteractive apt-get -y install $i
+  done
+  mkdir -p /etc/swift
   set_swift_hash || exit 1
   create_proxy_conf
   if [[ ! -e /etc/swift/cert.crt ]] ; then
@@ -22,10 +27,53 @@ function install_hook {
   fi
   perl -pi -e "s/-l 127.0.0.1/-l $PROXY_LOCAL_NET_IP/" /etc/memcached.conf
   service memcached restart
+  echo "swift-proxy-node - install: Initializing rings"
+  for i in account container object ; do initialize_ring $i ; done
+  mkdir -p $WWW_DIR
+}
+
+function proxy_joined {
+  exit 0
+}
+
+function proxy_changed {
+  ZONE=`relation-get zone`
+  IP=`relation-get ip`
+  DEVICE=`relation-get device`
+  [[ -z $ZONE ]] || [[ -z $IP ]] || [[ -z $DEVICE ]] && \
+    echo "ZONE|IP|DEVICE not set.  Peer not ready? Exit 0 and wait." && exit 0
+
+  if [[ $ZONE -gt $REPLICAS ]] ; then
+    echo "ERROR: Peer $ENSEMBLE_REMOTE_UNIT attempting to join a non-existent zone!"
+    exit 1
+  fi
+  PORT=6000
+  RINGS="object container account"
+
+  # reinitialize rings if there are any missing
+  ring_missing=0
+  for i in $RINGS ; do
+    [[ ! -e /etc/swift/$i.builder ]] && ring_missing=1
+  done
+  [[ $ring_missing != "0" ]] && initialize_rings
+
+  for i in $RINGS ; do
+    add_to_ring $i $ZONE $IP $PORT $DEVICE || exit 1
+  done
+  for i in $RINGS ; do
+    rebalance_ring $i || exit 1
+  done
+  stamp=`date +%Y%M%d-%H%M%S`
+  export_dir="$WWW_DIR/$stamp"
+  mkdir $export_dir
+  echo "Copying rings to $export_dir for client consumption"
+  relation-set update_url="http://$IP/$stamp"
 }
 
 case $ARG0 in
   "install") install_hook ;;
   "start"|"stop") exit 0 ;;
+  "swift-proxy-relation-joined") proxy_joined ;;
+  "swift-proxy-relation-changed") proxy_changed ;;
 esac
 
