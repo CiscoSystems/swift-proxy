@@ -50,26 +50,33 @@ function proxy_changed {
   PORT=6000
   RINGS="object container account"
 
-  # reinitialize rings if there are any missing
-  ring_missing=0
   for i in $RINGS ; do
-    [[ ! -e /etc/swift/$i.builder ]] && ring_missing=1
+    if [[ ! -e /etc/swift/$i.builder ]] ; then
+      echo "Ring $i missing, initializing"
+      initialize_ring $i
+    fi
   done
-  [[ $ring_missing != "0" ]] && initialize_rings
 
   for i in $RINGS ; do
     add_to_ring $i $ZONE $IP $PORT $DEVICE || exit 1
   done
-  for i in $RINGS ; do
-    rebalance_ring $i || exit 1
-  done
-  stamp=`date +%Y%M%d-%H%M%S`
-  export_dir="$WWW_DIR/$stamp"
-  mkdir $export_dir
-  echo "Copying rings to $export_dir for client consumption"
-  relation-set update_url="http://$IP/$stamp"
+
+  if [[ $(relation-get | wc -l) -lt $REPLICAS ]] ; then
+    echo "Not enough peers, will not balance rings yet."
+    exit 0
+  fi
+
+#  for i in $RINGS ; do
+#    rebalance_ring $i || exit 1
+#  done
+#  stamp=`date +%Y%M%d-%H%M%S`
+#  export_dir="$WWW_DIR/$stamp"
+#  mkdir $export_dir
+#  echo "Copying rings to $export_dir for client consumption"
+#  relation-set update_url="http://$IP/$stamp"
 }
 
+ensemble-log "swift-proxy: Firing hook $ARG0"
 case $ARG0 in
   "install") install_hook ;;
   "start"|"stop") exit 0 ;;
