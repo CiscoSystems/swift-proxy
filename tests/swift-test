@@ -1,0 +1,116 @@
+#!/bin/bash
+# Tests account access via proxy and file upload
+# and download to swift. Right now meant to be run on ec2, will change later.
+#
+# TODO: Generate test files with something other than /dev/zero and check
+#       integrity after download.
+#
+# Author: Adam Gandelman <adamg@canonical.com>
+
+PWD=`pwd`
+PROXY_IP=`ec2metadata 2>/dev/null  | grep local-ipv4  | awk '{ print $2 }'`
+PROXY_IP=$PROXY_IP
+TEST_USER=root
+TEST_PASS=testpass
+CONTAINER=testcontainer
+TEST_DIR=/tmp/swift
+
+###
+# Test account server via proxy
+echo -n "Testing proxy server @ $PROXY_IP: "
+RESP=$(curl -w "http_code: %{http_code}\n" -k -i \
+	-H "X-Storage-User: system:$TEST_USER" \
+	-H "X-Storage-Pass: $TEST_PASS" \
+	https://$PROXY_IP:8080/auth/v1.0 2>/dev/null \
+	| grep http_code: | awk '{ print $2 }')
+
+[[ $RESP != "200" ]] && echo "ERROR: RESP != 200 from server" && exit 1
+echo "OK"
+
+echo -n "Requesting url and auth token for user $TEST_USER with password $TEST_PASS: "
+TOKEN=$(curl -w "http_code: %{http_code}\n" -k -i \
+        -H "X-Storage-User: system:$TEST_USER" \
+        -H "X-Storage-Pass: $TEST_PASS" \
+        https://$PROXY_IP:8080/auth/v1.0 2>/dev/null \
+        | grep X-Auth-Token | awk '{ print $2 }')
+URL=$(curl -w "http_code: %{http_code}\n" -k -i \
+        -H "X-Storage-User: system:$TEST_USER" \
+        -H "X-Storage-Pass: $TEST_PASS" \
+        https://$PROXY_IP:8080/auth/v1.0 2>/dev/null \
+        | grep X-Storage-Url | awk '{ print $2 }')
+[[ -z $TOKEN ]] || [[ -z $URL ]] && \
+	echo "ERROR: Did not recieve token or url. URL=$URL TOKEN=$TOKEN" && exit 1
+echo "OK"
+echo "URL=$URL"
+echo "TOKEN=$TOKEN"
+
+echo -n "Testing TOKEN @ URL: "
+RESP=$(curl -w "http_code: %{http_code}\n" -k -i \
+	-H "X-Auth-Token: $TOKEN" $URL 2>/dev/null \
+	| grep http_code: | awk '{ print $2 }')
+
+if [[ $RESP != "200" ]] && [[ $RESP != "204" ]] ; then 
+	echo "ERROR: http_code $RESP, expecting 200 or 204"
+fi
+echo "OK"
+
+###
+# Test swift
+
+function run_swift {
+	COMMAND="swift -A https://$PROXY_IP:8080/auth/v1.0 \
+		 -U system:$TEST_USER \
+		 -K $TEST_PASS $1"
+	$COMMAND
+}
+
+echo -n "Testing swift stat: "
+run_swift stat | grep Containers >/dev/null
+[[ $? != 0 ]] && echo "ERROR could not query for empty container"
+echo "OK"
+
+echo -n "Creating 3 25MB test files for upload in $TEST_DIR: "
+mkdir -p $TEST_DIR
+for i in 1 2 3 ; do 
+	dd if=/dev/zero of=$TEST_DIR/testfile$i bs=1M count=25 >/dev/null 2>&1 || exit 1
+done
+echo "OK"
+
+echo "Uploading test files to $CONTAINER from $TEST_DIR: "
+cd $TEST_DIR
+for i in `ls | grep -v download` ; do
+	echo -ne "\t$i: "
+	# output of successful upload is the filename uploaded.
+	uploaded=$(run_swift "upload $CONTAINER $i")
+	[[ $uploaded != $i ]] && \
+		echo "FAIL" && exit 1 
+	echo "OK"
+done
+
+echo "Downloading container $CONTAINER to $TEST_DIR/download: "
+mkdir -p $TEST_DIR/download
+cd $TEST_DIR/download
+run_swift "download $CONTAINER" >>/dev/null 2>&1
+echo "OK"
+echo "Verifying upload vs download: "
+cd $TEST_DIR
+for i in `ls | grep -v download` ; do
+	local_size=$(stat -c%s $i)
+	echo -e "\tLocal file: $i"
+	echo -ne "\t\tDownloaded: $TEST_DIR/download/$i - "
+	ls $TEST_DIR/download/$i >/dev/null 2>&1 
+	if [[ $? != 0 ]] ; then
+		echo -e "FAILED\nERROR: Uploaded file $i was not downloaded to $TEMP_DIR/download"
+		exit 1
+	fi
+	echo "OK"
+	down_size=$(stat -c%s $TEST_DIR/download/$i)
+        echo -ne "\t\tBytes: Uploaded ($local_size bytes) Downloaded ($down_size) - "
+	if [[ $local_size != $down_size ]] ; then
+		echo -e "FAILED\nERROR: Downloaded size of $i does not match uploaded"
+		exit 1
+	fi
+	echo "OK"
+done
+echo "Test pass."
+cd $PWD
