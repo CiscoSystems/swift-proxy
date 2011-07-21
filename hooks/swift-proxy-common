@@ -77,6 +77,32 @@ function initialize_ring {
     create $PARTITION_POWER $REPLICAS $MIN_HOURS
 }
 
+function get_zone {
+  # a hack to assign units to zones until config is taken care of
+  # in ensemble
+  zone_file="/var/run/ensemble/swift-zone"
+  checked_in="/var/run/ensemble/checked-in"
+  if [[ -e $checked_in ]] ; then
+    # changed relation seems to run twice? dont get new zone if 
+    # we just got one
+    cat $checked_in | grep $ENSEMBLE_REMOTE_UNIT >/dev/null
+    if [[ $? == 0 ]] ; then
+      ZONE=$(cat $checked_in | grep $ENSEMBLE_REMOTE_UNIT | cut -d, -f2)
+      return 0
+    fi
+  fi
+  if [[ ! -e $zone_file ]] ; then
+    echo 1 > $zone_file
+  fi
+  ZONE=$(cat $zone_file)
+  echo "$ENSEMBLE_REMOTE_UNIT,$ZONE" >>$checked_in
+  if [[ $ZONE == $REPLICAS ]] ; then
+    echo 1 >$zone_file
+    return 0
+  fi
+  echo $[$ZONE+1] >$zone_file
+}
+
 function add_to_ring {
   # swift-ring-builder returns 1 for success, 2 for zero.
   # TODO: File bug for return codes
@@ -93,10 +119,16 @@ function add_to_ring {
   fi
 }
 
-function rebalance_ring {
-  # This exists to make up for non-standard return codes
-  ensemble-log "Rebalancing ring $1"
-  swift-ring-builder /etc/swift/$i.builder rebalance
+function exists_in_ring {
+  swift-ring-builder /etc/swift/$i.builder \
+    search z$ZONE-$IP:$PORT/$DEVICE
   [[ $? == "1" ]] && return 0
   return 1
+}
+
+function rebalance_ring {
+  # rebalance returns 0 on success, go figure
+  ensemble-log "Rebalancing ring $1"
+  swift-ring-builder /etc/swift/$i.builder rebalance
+  return $?
 }
