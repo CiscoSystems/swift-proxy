@@ -118,6 +118,16 @@ function proxy_broken {
   rm -rf /var/www/swift-rings
 }
 
+function object-store_joined {
+  # until we use keystone or another real auth system,
+  # just return a tempauth user from config.
+  USER=$(cat /etc/swift/proxy-server.conf | grep user_system_root | awk '{ print $1 }')
+  USER=${USER##*_}
+  PASSWORD=$(cat /etc/swift/proxy-server.conf | grep user_system_root | cut -d= -f2 | awk '{ print $1 }')
+  URL=https://$(hostname -f):8080/auth/v1.0
+  relation-set user=$USER password=$PASSWORD url=$URL
+}
+
 [[ -d /etc/swift ]] && chown -R swift /etc/swift
 
 ensemble-log "swift-proxy: Firing hook $ARG0"
@@ -127,5 +137,7 @@ case $ARG0 in
   "swift-proxy-relation-joined") proxy_joined ;;
   "swift-proxy-relation-changed") proxy_changed ;;
   "swift-proxy-relation-broken") proxy_broken ;;
+  "object-store-relation-joined") object-store_joined ;;
+  "object-store-relation-changed") exit 0 ;;
 esac
 
