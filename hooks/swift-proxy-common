@@ -1,10 +1,11 @@
 #!/bin/bash
 set -u
 # For openssl cert generation
-COUNTRY="US"
-STATE="OR"
-LOCALE="Portland"
-COMMON_NAME="swift-proxy.ensemble-test.com"
+COUNTRY=$(config-get country)
+STATE=$(config-get state)
+LOCALE=$(config-get locale)
+COMMON_NAME=$(config-get common-name)
+PPA=$(config-get swift-release)
 
 DEFAULT_ETH=$(ip route  | grep default | awk '{ print $5 }')
 IP=$(ifconfig  $DEFAULT_ETH | grep 'inet addr' | awk '{ print $2 }' | cut -d: -f2)
@@ -23,9 +24,9 @@ WWW_DIR="/var/www/swift-rings"
 SWIFT_HASH_FILE="/var/lib/ensemble/swift-hash-path.conf"
 
 # Ring configuration
-PARTITION_POWER="18"
-REPLICAS="3"
-MIN_HOURS="24"
+PARTITION_POWER=$(config-get partition-power)
+REPLICAS=$(config-get replicas)
+MIN_HOURS=$(config-get min-hours)
 
 # generate the swift hash to be used for salting URLs of objects.
 # TODO: its important this is never lost, find out some way of getting
@@ -135,3 +136,13 @@ function rebalance_ring {
   swift-ring-builder /etc/swift/$i.builder rebalance
   return $?
 }
+\
+function add_ppa {
+  # Don't configure PPA, install from archive.
+  [[ $PPA == "distro" ]] && exit 0
+  . /etc/lsb-release
+  [[ $PPA == "milestone" ]] && PPA="release"
+  PPA_URL="deb http://ppa.launchpad.net/swift-core/$PPA/ubuntu $DISTRIB_CODENAME main"
+  add-apt-repository "$PPA_URL" || exit 1
+}
+

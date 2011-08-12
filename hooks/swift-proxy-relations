@@ -11,7 +11,7 @@ fi
 
 function install_hook {
   apt-get -y install python-software-properties || exit 1
-  add-apt-repository ppa:swift-core/milestone-proposed || exit 1
+  add_ppa
   apt-get update
   for i in $PACKAGES ; do
     DEBIAN_FRONTEND=noninteractive apt-get -y install $i
@@ -19,6 +19,8 @@ function install_hook {
   mkdir -p /etc/swift
   set_swift_hash || exit 1
   create_proxy_conf
+  mkdir $WWW_DIR
+  chown www-data:www-data $WWW_DIR
   if [[ ! -e /etc/swift/cert.crt ]] ; then
     openssl req -new -x509 -nodes \
       -out /etc/swift/cert.crt \
@@ -29,7 +31,6 @@ function install_hook {
   service memcached restart
   echo "swift-proxy-node - install: Initializing rings"
   for i in account container object ; do initialize_ring $i ; done
-  mkdir -p $WWW_DIR && chown -R www-data $WWW_DIR
 }
 
 function proxy_joined {
@@ -39,7 +40,6 @@ function proxy_joined {
 function proxy_changed {
   HOST=`relation-get hostname`
   DEVICE=`relation-get device`
-  #ZONE=`relation-get zone`
   get_zone
   [[ -z $ZONE ]] || [[ -z $HOST ]] || [[ -z $DEVICE ]] && \
     echo "ZONE|HOST|DEVICE not set.  Peer not ready? Exit 0 and wait." && exit 0
@@ -89,21 +89,25 @@ function proxy_changed {
     rebalance_ring $i || exit 1
   done
 
-  chown -R swift /etc/swift
+  chown -R swift:swift /etc/swift
 
   stamp=`date +%Y%M%d-%H%M%S`
   export_dir="$WWW_DIR/$stamp"
   echo "$current_peers,$stamp" > $balance_file
 
   # rings have been balanced, push out new rings to nodes via webserver
-  mkdir -p $export_dir
+  mkdir $export_dir
   echo "Copying rings to $export_dir for client consumption"
   for i in $RINGS ; do
     cp /etc/swift/$i.ring.gz $export_dir
   done
+
   chown -R swift:swift /etc/swift
-  chown -R www-data $export_dir
+  chown -R www-data $WWW_DIR
+
   relation-set update_url="http://$(hostname -f)/swift-rings/$stamp"
+  relation-set swift_hash=$(cat $SWIFT_HASH_FILE)
+
   swift-init proxy status || swift-init proxy start
 }
 
