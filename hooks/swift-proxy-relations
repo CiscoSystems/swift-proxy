@@ -1,5 +1,6 @@
 #!/bin/bash
 set -u
+
 FORMULA_DIR=$(dirname $0)
 ARG0=${0##*/}
 
