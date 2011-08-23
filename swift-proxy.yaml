@@ -1,0 +1,13 @@
+swift-proxy:
+  # swift-core ppa to pull packages from.
+  # Valid options: trunk, milestone, distro (ubuntu archive)
+  swift-release: trunk
+  # swift ring configuration
+  partition-power: 8
+  replicas: 3
+  min-hours: 1
+  # to be used in CA cert creation
+  country: US
+  state: OR
+  locale: Portland
+  common-name: swift-proxy.yourcloud.com

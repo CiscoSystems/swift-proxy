@@ -1,0 +1,35 @@
+options:
+  swift-release:
+    default: distro
+    type: str
+    description: Swift PPA to configure (trunk, milestone, distro)
+  # Ring configuration
+  partition-power:
+    default: 8
+    type: int
+    description: Partition power.
+  replicas:
+    default: 3
+    type: int
+    description: Minimum replicas.
+  min-hours:
+    default: 1
+    type: int
+    description: Minimum hours between balances
+  # CA Cert info
+  country:
+    default: US
+    type: str
+    description: Country
+  state:
+    default: ST
+    type: str
+    description: State
+  locale:
+    default: City
+    type: str
+    description: Locale
+  common-name:
+    default: CN
+    type: str
+    description: Common Name
