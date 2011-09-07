@@ -1,7 +1,7 @@
 options:
   swift-release:
     default: distro
-    type: str
+    type: string
     description: Swift PPA to configure (trunk, milestone, distro)
   # Ring configuration
   partition-power:
@@ -19,17 +19,17 @@ options:
   # CA Cert info
   country:
     default: US
-    type: str
+    type: string
     description: Country
   state:
     default: ST
-    type: str
+    type: string
     description: State
   locale:
     default: City
-    type: str
+    type: string
     description: Locale
   common-name:
     default: CN
-    type: str
+    type: string
     description: Common Name
