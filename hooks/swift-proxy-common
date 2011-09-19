@@ -18,10 +18,10 @@ CORES=$(cat /proc/cpuinfo | grep processor | wc -l)
 PROXY_LOCAL_NET_IP=$IP
 
 # Use apache2 to distribute ring config until there is support
-# for file xfer in ensemble
+# for file xfer in juju
 PACKAGES="swift swift-proxy memcached apache2"
 WWW_DIR="/var/www/swift-rings"
-SWIFT_HASH_FILE="/var/lib/ensemble/swift-hash-path.conf"
+SWIFT_HASH_FILE="/var/lib/juju/swift-hash-path.conf"
 
 # Ring configuration
 PARTITION_POWER=$(config-get partition-power)
@@ -32,7 +32,7 @@ MIN_HOURS=$(config-get min-hours)
 # TODO: its important this is never lost, find out some way of getting
 # it off the server and into a sys admins INBOX?
 if [[ ! -e $SWIFT_HASH_FILE ]] ; then
-  ensemble-log "swift-proxy: Generating a new SWIFT_HASH in $SWIFT_HASH_FILE"
+  juju-log "swift-proxy: Generating a new SWIFT_HASH in $SWIFT_HASH_FILE"
   echo $(od -t x8 -N 8 -A n </dev/random) >$SWIFT_HASH_FILE
 fi
 
@@ -83,15 +83,15 @@ function initialize_ring {
 
 function get_zone {
   # a hack to assign units to zones until config is taken care of
-  # in ensemble
-  zone_file="/var/run/ensemble/swift-zone"
-  checked_in="/var/run/ensemble/checked-in"
+  # in juju
+  zone_file="/var/run/juju/swift-zone"
+  checked_in="/var/run/juju/checked-in"
   if [[ -e $checked_in ]] ; then
     # changed relation seems to run twice? dont get new zone if 
     # we just got one
-    cat $checked_in | grep $ENSEMBLE_REMOTE_UNIT >/dev/null
+    cat $checked_in | grep $JUJU_REMOTE_UNIT >/dev/null
     if [[ $? == 0 ]] ; then
-      ZONE=$(cat $checked_in | grep $ENSEMBLE_REMOTE_UNIT | cut -d, -f2)
+      ZONE=$(cat $checked_in | grep $JUJU_REMOTE_UNIT | cut -d, -f2)
       return 0
     fi
   fi
@@ -99,7 +99,7 @@ function get_zone {
     echo 1 > $zone_file
   fi
   ZONE=$(cat $zone_file)
-  echo "$ENSEMBLE_REMOTE_UNIT,$ZONE" >>$checked_in
+  echo "$JUJU_REMOTE_UNIT,$ZONE" >>$checked_in
   if [[ $ZONE == $REPLICAS ]] ; then
     echo 1 >$zone_file
     return 0
@@ -110,15 +110,15 @@ function get_zone {
 function add_to_ring {
   # swift-ring-builder returns 1 for success, 2 for zero.
   # TODO: File bug for return codes
-  ensemble-log "swift-proxy: Updating $1 ring. Adding $IP:$PORT, zone $ZONE, device $DEVICE"
+  juju-log "swift-proxy: Updating $1 ring. Adding $IP:$PORT, zone $ZONE, device $DEVICE"
   swift-ring-builder /etc/swift/$1.builder add \
     z$ZONE-$IP:$PORT/$DEVICE 100
   rc=$?
   if [[ $rc == "1" ]] ; then
-    ensemble-log "Added to ring: $IP:$PORT, zone $ZONE, device $DEVICE"
+    juju-log "Added to ring: $IP:$PORT, zone $ZONE, device $DEVICE"
     return 0
   else
-    ensemble-log "swift-proxy: Failed to add to ring."
+    juju-log "swift-proxy: Failed to add to ring."
     return 1
   fi
 }
@@ -132,7 +132,7 @@ function exists_in_ring {
 
 function rebalance_ring {
   # rebalance returns 0 on success, go figure
-  ensemble-log "Rebalancing ring $1"
+  juju-log "Rebalancing ring $1"
   swift-ring-builder /etc/swift/$i.builder rebalance
   return $?
 }

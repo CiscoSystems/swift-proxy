@@ -46,7 +46,7 @@ function proxy_changed {
     echo "ZONE|HOST|DEVICE not set.  Peer not ready? Exit 0 and wait." && exit 0
 
   if [[ $ZONE -gt $REPLICAS ]] ; then
-    echo "ERROR: Peer $ENSEMBLE_REMOTE_UNIT attempting to join a non-existent zone!"
+    echo "ERROR: Peer $JUJU_REMOTE_UNIT attempting to join a non-existent zone!"
     exit 1
   fi
   PORT=6000
@@ -63,7 +63,7 @@ function proxy_changed {
     if ! exists_in_ring ; then
       add_to_ring $i $ZONE $IP $PORT $DEVICE || exit 1
     else
-      ensemble-log "swift-proxy: $IP:$PORT/$DEVICE already exists in $ZONE"
+      juju-log "swift-proxy: $IP:$PORT/$DEVICE already exists in $ZONE"
     fi
     PORT=$[$PORT+1]
   done
@@ -72,7 +72,7 @@ function proxy_changed {
   current_peers=$(relation-list | wc -l)
 
   # checks to find out if we should rebalance rings
-  balance_file="/var/run/ensemble/swift-balanced"
+  balance_file="/var/run/juju/swift-balanced"
 
   if [[ $current_peers -lt $REPLICAS ]] ; then
     echo "Not enough peers to maitain minimum $REPLICAS replicas ($current_peers/$REPLICAS), skipping rebalance."
@@ -117,9 +117,9 @@ function proxy_broken {
   rm -rf /etc/swift/*.ring.gz
   rm -rf /etc/swift/*.builder
   rm -rf /etc/swift/backups
-  rm -rf /var/run/ensemble/swift-balanced
-  rm -rf /var/run/ensemble/checked-in
-  rm -rf /var/run/ensemble/swift-zone
+  rm -rf /var/run/juju/swift-balanced
+  rm -rf /var/run/juju/checked-in
+  rm -rf /var/run/juju/swift-zone
   rm -rf /var/www/swift-rings
 }
 
@@ -135,7 +135,7 @@ function object-store_joined {
 
 [[ -d /etc/swift ]] && chown -R swift /etc/swift
 
-ensemble-log "swift-proxy: Firing hook $ARG0"
+juju-log "swift-proxy: Firing hook $ARG0"
 case $ARG0 in
   "install") install_hook ;;
   "start"|"stop") exit 0 ;;
