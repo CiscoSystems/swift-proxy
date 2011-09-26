@@ -139,7 +139,7 @@ function rebalance_ring {
 \
 function add_ppa {
   # Don't configure PPA, install from archive.
-  [[ $PPA == "distro" ]] && exit 0
+  [[ $PPA == "distro" ]] && return 0
   . /etc/lsb-release
   [[ $PPA == "milestone" ]] && PPA="release"
   PPA_URL="deb http://ppa.launchpad.net/swift-core/$PPA/ubuntu $DISTRIB_CODENAME main"
