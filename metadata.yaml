@@ -1,6 +1,6 @@
 ensemble: formula
 name: swift-proxy
-revision: 64
+revision: 67
 summary: "Swift proxy node"
 description: |
   Swift is a distributed virtual object store. This formula deploys the proxy node
