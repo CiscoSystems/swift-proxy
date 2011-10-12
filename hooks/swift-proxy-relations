@@ -106,7 +106,7 @@ function proxy_changed {
   chown -R swift:swift /etc/swift
   chown -R www-data $WWW_DIR
 
-  relation-set update_url="http://$(hostname -f)/swift-rings/$stamp"
+  relation-set update_url="http://$(unit-get private-address)/swift-rings/$stamp"
   relation-set swift_hash=$(cat $SWIFT_HASH_FILE)
 
   swift-init proxy status || swift-init proxy start
@@ -129,7 +129,7 @@ function object-store_joined {
   USER=$(cat /etc/swift/proxy-server.conf | grep user_system_root | awk '{ print $1 }')
   USER=${USER##*_}
   PASSWORD=$(cat /etc/swift/proxy-server.conf | grep user_system_root | cut -d= -f2 | awk '{ print $1 }')
-  URL=https://$(hostname -f):8080/auth/v1.0
+  URL=https://$(unit-get private-address):8080/auth/v1.0
   relation-set user=$USER password=$PASSWORD url=$URL
 }
 
