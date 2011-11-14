@@ -7,15 +7,12 @@ LOCALE=$(config-get locale)
 COMMON_NAME=$(config-get common-name)
 PPA=$(config-get swift-release)
 
-DEFAULT_ETH=$(ip route  | grep default | awk '{ print $5 }')
-IP=$(ifconfig  $DEFAULT_ETH | grep 'inet addr' | awk '{ print $2 }' | cut -d: -f2)
-
 # Used in proxy-server.conf.  Run one worker per cpu core for now
 CORES=$(cat /proc/cpuinfo | grep processor | wc -l)
 
 # TODO: Need to use different addresses for internal swift traffic
 # as this the only security measure in place is network isolation
-PROXY_LOCAL_NET_IP=$IP
+PROXY_LOCAL_NET_IP=`dig +short $(unit-get private-address)`
 
 # Use apache2 to distribute ring config until there is support
 # for file xfer in juju
@@ -130,7 +127,7 @@ function rebalance_ring {
   swift-ring-builder /etc/swift/$i.builder rebalance
   return $?
 }
-\
+
 function add_ppa {
   # Don't configure PPA, install from archive.
   [[ $PPA == "distro" ]] && return 0
@@ -139,4 +136,3 @@ function add_ppa {
   PPA_URL="deb http://ppa.launchpad.net/swift-core/$PPA/ubuntu $DISTRIB_CODENAME main"
   add-apt-repository "$PPA_URL" || exit 1
 }
-
