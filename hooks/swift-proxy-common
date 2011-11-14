@@ -108,30 +108,24 @@ function get_zone {
 }
 
 function add_to_ring {
-  # swift-ring-builder returns 1 for success, 2 for zero.
-  # TODO: File bug for return codes
   juju-log "swift-proxy: Updating $1 ring. Adding $IP:$PORT, zone $ZONE, device $DEVICE"
   swift-ring-builder /etc/swift/$1.builder add \
     z$ZONE-$IP:$PORT/$DEVICE 100
   rc=$?
-  if [[ $rc == "1" ]] ; then
+  if [[ "$rc" == "0" ]] ; then
     juju-log "Added to ring: $IP:$PORT, zone $ZONE, device $DEVICE"
     return 0
-  else
-    juju-log "swift-proxy: Failed to add to ring."
-    return 1
   fi
+  juju-log "swift-proxy: Failed to add to ring."
+  return 1
 }
 
 function exists_in_ring {
   swift-ring-builder /etc/swift/$i.builder \
     search z$ZONE-$IP:$PORT/$DEVICE
-  [[ $? == "1" ]] && return 0
-  return 1
 }
 
 function rebalance_ring {
-  # rebalance returns 0 on success, go figure
   juju-log "Rebalancing ring $1"
   swift-ring-builder /etc/swift/$i.builder rebalance
   return $?
