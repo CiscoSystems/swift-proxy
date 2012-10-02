@@ -37,3 +37,28 @@ options:
     default: 8080
     type: int
     description: TCP port to listen on
+  auth-type:
+    default: tempauth
+    type: string
+    description: Auth method to use, tempauth or keystone
+  keystone-auth-host:
+    type: string
+    description: Keystone authentication host
+  keystone-auth-port:
+    default: 35357
+    type: int
+    description: Keystone authentication port
+  keystone-auth-protocol:
+    default: http
+    type: string
+    description: Keystone authentication protocol
+  keystone-admin-tenant-name:
+    default: service
+    type: string
+    description: Keystone admin tenant name
+  keystone-admin-user:
+    type: string
+    description: Keystone admin username
+  keystone-admin-password:
+    type: string
+    description: Keystone admin password

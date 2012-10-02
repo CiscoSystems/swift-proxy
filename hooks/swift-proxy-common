@@ -7,6 +7,13 @@ LOCALE=$(config-get locale)
 COMMON_NAME=$(config-get common-name)
 PPA=$(config-get swift-release)
 BINDPORT=$(config-get bind-port)
+AUTHTYPE=$(config-get auth-type)
+KEYSTONE_AUTH_HOST=$(config-get keystone-auth-host)
+KEYSTONE_AUTH_PORT=$(config-get keystone-auth-port)
+KEYSTONE_AUTH_PROTOCOL=$(config-get keystone-auth-protocol)
+KEYSTONE_ADMIN_TENANT_NAME=$(config-get keystone-admin-tenant-name)
+KEYSTONE_ADMIN_USER=$(config-get keystone-admin-user)
+KEYSTONE_ADMIN_PASSWORD=$(config-get keystone-admin-password)
 
 # Used in proxy-server.conf.  Run one worker per cpu core for now
 CORES=$(cat /proc/cpuinfo | grep processor | wc -l)
@@ -18,6 +25,9 @@ PROXY_LOCAL_NET_IP=`dig +short $(unit-get private-address)`
 # Use apache2 to distribute ring config until there is support
 # for file xfer in juju
 PACKAGES="swift swift-proxy memcached apache2"
+if [ "$AUTHTYPE" = "keystone" ]; then
+  PACKAGES="$PACKAGES python-keystone"
+fi
 WWW_DIR="/var/www/swift-rings"
 SWIFT_HASH_FILE="/var/lib/juju/swift-hash-path.conf"
 
@@ -52,6 +62,46 @@ bind_port = $BINDPORT
 workers = $CORES
 user = swift
 
+EOF
+if [ "$AUTHTYPE" = "keystone" ]; then
+  cat >>/etc/swift/proxy-server.conf <<EOF
+[pipeline:main]
+pipeline = healthcheck cache swift3 s3token authtoken keystone proxy-server
+
+[app:proxy-server]
+use = egg:swift#proxy
+allow_account_management = true
+account_autocreate = true
+
+[filter:keystone]
+paste.filter_factory = keystone.middleware.swift_auth:filter_factory
+operator_roles = admin, swiftaccess
+
+[filter:authtoken]
+paste.filter_factory = keystone.middleware.auth_token:filter_factory
+# Delaying the auth decision is required to support token-less
+# usage for anonymous referrers ('.r:*') or for tempurl/formpost
+# middleware.
+delay_auth_decision = 1
+auth_port = $KEYSTONE_AUTH_PORT
+auth_host = $KEYSTONE_AUTH_HOST
+auth_protocol = $KEYSTONE_AUTH_PROTOCOL
+admin_tenant_name = $KEYSTONE_ADMIN_TENANT_NAME
+admin_user = $KEYSTONE_ADMIN_USER
+admin_password = $KEYSTONE_ADMIN_PASSWORD
+
+[filter:swift3]
+use = egg:swift#swift3
+
+[filter:s3token]
+paste.filter_factory = keystone.middleware.s3_token:filter_factory
+auth_port = $KEYSTONE_AUTH_PORT
+auth_host = $KEYSTONE_AUTH_HOST
+auth_protocol = $KEYSTONE_AUTH_PROTOCOL
+
+EOF
+else
+  cat >>/etc/swift/proxy-server.conf <<EOF
 [pipeline:main]
 pipeline = healthcheck cache tempauth proxy-server
 
@@ -63,12 +113,16 @@ allow_account_management = true
 use = egg:swift#tempauth
 user_system_root = testpass .admin https://$PROXY_LOCAL_NET_IP:8080/v1/AUTH_system
 
+EOF
+fi
+cat >>/etc/swift/proxy-server.conf <<EOF
 [filter:healthcheck]
 use = egg:swift#healthcheck
 
 [filter:cache]
 use = egg:swift#memcache
 memcache_servers = $PROXY_LOCAL_NET_IP:11211
+
 EOF
 }
 
