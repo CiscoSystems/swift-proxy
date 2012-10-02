@@ -6,6 +6,7 @@ STATE=$(config-get state)
 LOCALE=$(config-get locale)
 COMMON_NAME=$(config-get common-name)
 PPA=$(config-get swift-release)
+BINDPORT=$(config-get bind-port)
 
 # Used in proxy-server.conf.  Run one worker per cpu core for now
 CORES=$(cat /proc/cpuinfo | grep processor | wc -l)
@@ -47,7 +48,7 @@ cat >/etc/swift/proxy-server.conf <<EOF
 [DEFAULT]
 cert_file = /etc/swift/cert.crt
 key_file = /etc/swift/cert.key
-bind_port = 8080
+bind_port = $BINDPORT
 workers = $CORES
 user = swift
 

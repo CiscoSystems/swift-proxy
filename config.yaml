@@ -33,3 +33,7 @@ options:
     default: CN
     type: string
     description: Common Name
+  bind-port:
+    default: 8080
+    type: int
+    description: TCP port to listen on
