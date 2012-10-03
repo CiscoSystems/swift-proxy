@@ -63,6 +63,6 @@ options:
     type: string
     description: Keystone admin password
   swift-series:
+    default: "1.4"
     type: string
     description: Swift major series being installed (via swift-release)
-    default: 1.4
