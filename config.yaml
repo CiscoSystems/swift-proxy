@@ -62,3 +62,7 @@ options:
   keystone-admin-password:
     type: string
     description: Keystone admin password
+  swift-series:
+    type: string
+    description: Swift major series being installed (via swift-release)
+    default: 1.4

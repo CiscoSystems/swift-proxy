@@ -14,6 +14,7 @@ KEYSTONE_AUTH_PROTOCOL=$(config-get keystone-auth-protocol)
 KEYSTONE_ADMIN_TENANT_NAME=$(config-get keystone-admin-tenant-name)
 KEYSTONE_ADMIN_USER=$(config-get keystone-admin-user)
 KEYSTONE_ADMIN_PASSWORD=$(config-get keystone-admin-password)
+SWIFT_SERIES=$(config-get swift-series)
 
 # Used in proxy-server.conf.  Run one worker per cpu core for now
 CORES=$(cat /proc/cpuinfo | grep processor | wc -l)
@@ -64,6 +65,13 @@ user = swift
 
 EOF
 if [ "$AUTHTYPE" = "keystone" ]; then
+  if [ "$SWIFT_SERIES" = "1.7" ]; then
+    SIGNING_DIR_LINE="signing_dir = /etc/swift"
+    SWIFT3_LINE="use = egg:swift3#swift3"
+  else
+    SIGNING_DIR_LINE=""
+    SWIFT3_LINE="use = egg:swift#swift3"
+  fi
   cat >>/etc/swift/proxy-server.conf <<EOF
 [pipeline:main]
 pipeline = healthcheck cache swift3 s3token authtoken keystone proxy-server
@@ -89,9 +97,10 @@ auth_protocol = $KEYSTONE_AUTH_PROTOCOL
 admin_tenant_name = $KEYSTONE_ADMIN_TENANT_NAME
 admin_user = $KEYSTONE_ADMIN_USER
 admin_password = $KEYSTONE_ADMIN_PASSWORD
+$SIGNING_DIR_LINE
 
 [filter:swift3]
-use = egg:swift#swift3
+$SWIFT3_LINE
 
 [filter:s3token]
 paste.filter_factory = keystone.middleware.s3_token:filter_factory

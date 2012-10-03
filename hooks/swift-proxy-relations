@@ -17,6 +17,15 @@ function install_hook {
   for i in $PACKAGES ; do
     DEBIAN_FRONTEND=noninteractive apt-get -y --force-yes install $i
   done
+
+  # AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA
+  if [ "$SWIFT_SERIES" = "1.7" ]; then
+    (
+    cd "$(dirname $0)/fujita-swift3-f216f1b"
+    python setup.py install
+    )
+  fi
+
   mkdir -p /etc/swift
   set_swift_hash || exit 1
   create_proxy_conf
