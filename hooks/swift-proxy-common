@@ -14,7 +14,6 @@ KEYSTONE_AUTH_PROTOCOL=$(config-get keystone-auth-protocol)
 KEYSTONE_ADMIN_TENANT_NAME=$(config-get keystone-admin-tenant-name)
 KEYSTONE_ADMIN_USER=$(config-get keystone-admin-user)
 KEYSTONE_ADMIN_PASSWORD=$(config-get keystone-admin-password)
-SWIFT_SERIES=$(config-get swift-series)
 
 # Used in proxy-server.conf.  Run one worker per cpu core for now
 CORES=$(cat /proc/cpuinfo | grep processor | wc -l)
@@ -55,6 +54,7 @@ EOF
 }
 
 function create_proxy_conf {
+SWIFT_DEB_VERSION="$(dpkg-query -W -f='${Version}' 'swift-proxy')"
 cat >/etc/swift/proxy-server.conf <<EOF
 [DEFAULT]
 cert_file = /etc/swift/cert.crt
@@ -65,7 +65,7 @@ user = swift
 
 EOF
 if [ "$AUTHTYPE" = "keystone" ]; then
-  if [ "$SWIFT_SERIES" = "1.7" ]; then
+  if [ "${SWIFT_DEB_VERSION:0:3}" = "1.7" ]; then
     SIGNING_DIR_LINE="signing_dir = /etc/swift"
     SWIFT3_LINE="use = egg:swift3#swift3"
   else

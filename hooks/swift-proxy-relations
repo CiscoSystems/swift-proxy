@@ -18,8 +18,9 @@ function install_hook {
     DEBIAN_FRONTEND=noninteractive apt-get -y --force-yes install $i
   done
 
+  SWIFT_DEB_VERSION="$(dpkg-query -W -f='${Version}' 'swift-proxy')"
   # AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA
-  if [ "$SWIFT_SERIES" = "1.7" ]; then
+  if [ "${SWIFT_DEB_VERSION:0:3}" = "1.7" ]; then
     (
     cd "$(dirname $0)/fujita-swift3-f216f1b"
     python setup.py install
