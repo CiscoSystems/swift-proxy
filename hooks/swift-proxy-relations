@@ -11,11 +11,11 @@ else
 fi
 
 function install_hook {
-  apt-get -y install python-software-properties || exit 1
+  apt-get -y --force-yes install python-software-properties || exit 1
   add_ppa
   apt-get update
   for i in $PACKAGES ; do
-    DEBIAN_FRONTEND=noninteractive apt-get -y install $i
+    DEBIAN_FRONTEND=noninteractive apt-get -y --force-yes install $i
   done
   mkdir -p /etc/swift
   set_swift_hash || exit 1
