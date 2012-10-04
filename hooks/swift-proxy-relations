@@ -30,11 +30,13 @@ function install_hook {
   create_proxy_conf
   mkdir $WWW_DIR
   chown www-data:www-data $WWW_DIR
-  if [[ ! -e /etc/swift/cert.crt ]] ; then
-    openssl req -new -x509 -nodes \
-      -out /etc/swift/cert.crt \
-      -keyout /etc/swift/cert.key \
-      -subj "/C=$COUNTRY/ST=$STATE/L=$LOCALE/CN=$COMMON_NAME"
+  if [ "$USE_HTTPS" = "1" ]; then
+    if [[ ! -e /etc/swift/cert.crt ]] ; then
+      openssl req -new -x509 -nodes \
+        -out /etc/swift/cert.crt \
+        -keyout /etc/swift/cert.key \
+        -subj "/C=$COUNTRY/ST=$STATE/L=$LOCALE/CN=$COMMON_NAME"
+    fi
   fi
   perl -pi -e "s/-l 127.0.0.1/-l $PROXY_LOCAL_NET_IP/" /etc/memcached.conf
   service memcached restart

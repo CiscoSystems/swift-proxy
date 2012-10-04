@@ -17,6 +17,10 @@ options:
     type: int
     description: Minimum hours between balances
   # CA Cert info
+  use-https:
+    default: 1
+    type: int
+    description: Whether to listen on HTTPS
   country:
     default: US
     type: string

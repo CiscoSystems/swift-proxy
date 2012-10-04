@@ -1,6 +1,7 @@
 #!/bin/bash
 set -u
 # For openssl cert generation
+USE_HTTPS=$(config-get use-https)
 COUNTRY=$(config-get country)
 STATE=$(config-get state)
 LOCALE=$(config-get locale)
@@ -59,8 +60,13 @@ function create_proxy_conf {
 SWIFT_DEB_VERSION="$(dpkg-query -W -f='${Version}' 'swift-proxy')"
 cat >/etc/swift/proxy-server.conf <<EOF
 [DEFAULT]
+EOF
+if [ "$USE_HTTPS" = "1" ]; then
+  cat >>/etc/swift/proxy-server.conf <<EOF
 cert_file = /etc/swift/cert.crt
 key_file = /etc/swift/cert.key
+EOF
+fi
 bind_port = $BINDPORT
 workers = $WORKERS
 user = swift
