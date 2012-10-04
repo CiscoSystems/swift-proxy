@@ -37,6 +37,10 @@ options:
     default: 8080
     type: int
     description: TCP port to listen on
+  workers:
+    default: 0
+    type: int
+    description: Number of TCP workers to launch (0 for the number of system cores)
   auth-type:
     default: tempauth
     type: string

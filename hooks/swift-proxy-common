@@ -7,6 +7,7 @@ LOCALE=$(config-get locale)
 COMMON_NAME=$(config-get common-name)
 PPA=$(config-get swift-release)
 BINDPORT=$(config-get bind-port)
+WORKERS=$(config-get workers)
 AUTHTYPE=$(config-get auth-type)
 KEYSTONE_AUTH_HOST=$(config-get keystone-auth-host)
 KEYSTONE_AUTH_PORT=$(config-get keystone-auth-port)
@@ -15,8 +16,9 @@ KEYSTONE_ADMIN_TENANT_NAME=$(config-get keystone-admin-tenant-name)
 KEYSTONE_ADMIN_USER=$(config-get keystone-admin-user)
 KEYSTONE_ADMIN_PASSWORD=$(config-get keystone-admin-password)
 
-# Used in proxy-server.conf.  Run one worker per cpu core for now
+# Used in proxy-server.conf.  Run one worker per cpu core by default.
 CORES=$(cat /proc/cpuinfo | grep processor | wc -l)
+[ "$WORKERS" = "0" ] && WORKERS="$CORES"
 
 # TODO: Need to use different addresses for internal swift traffic
 # as this the only security measure in place is network isolation
@@ -60,7 +62,7 @@ cat >/etc/swift/proxy-server.conf <<EOF
 cert_file = /etc/swift/cert.crt
 key_file = /etc/swift/cert.key
 bind_port = $BINDPORT
-workers = $CORES
+workers = $WORKERS
 user = swift
 
 EOF
