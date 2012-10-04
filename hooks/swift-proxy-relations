@@ -11,6 +11,13 @@ else
 fi
 
 function install_hook {
+  ### CANONICAL-SPECIFIC BEGIN ###
+  # MAAS preseed is forcing apt to proxy through the deb caching proxy
+  # on the MAAS server.  This is preventing us from getting to
+  # cloud-archive.  Stop it.
+  rm -f /etc/apt/apt.conf
+  ### CANONICAL-SPECIFIC END ###
+
   apt-get -y --force-yes install python-software-properties || exit 1
   add_ppa
   apt-get update
