@@ -19,12 +19,10 @@ function install_hook {
   done
 
   SWIFT_DEB_VERSION="$(dpkg-query -W -f='${Version}' 'swift-proxy')"
-  # AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA
+  # We are shipping swift-plugin-s3 here until it becomes available in
+  # ubuntu-cloud.archive precise-updates/folsom
   if [ "${SWIFT_DEB_VERSION:0:3}" = "1.7" ]; then
-    (
-    cd "$(dirname $0)/fujita-swift3-f216f1b"
-    python setup.py install
-    )
+    dpkg -i "$(dirname $0)/swift-plugin-s3_1.0.0~git201200618-0ubuntu1_all.deb"
   fi
 
   mkdir -p /etc/swift
