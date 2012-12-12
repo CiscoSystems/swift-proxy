@@ -1,4 +1,3 @@
-ensemble: formula
 name: swift-proxy
 maintainer: Adam Gandelman <adamg@canonical.com>
 summary: "Swift proxy node"
@@ -13,3 +12,5 @@ provides:
 requires:
   swift-storage:
     interface: swift
+  identity-service:
+    interface: keystone
