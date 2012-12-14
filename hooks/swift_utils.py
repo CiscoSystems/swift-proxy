@@ -189,7 +189,7 @@ def write_proxy_config():
         conf.write(render_config(SWIFT_PROXY_CONF, ctxt))
 
     proxy_control('restart')
-    subprocess.check_call(['open-port', bind_port])
+    subprocess.check_call(['open-port', str(bind_port)])
 
 def configure_ssl():
     # this should be expanded to cover setting up user-specified certificates
