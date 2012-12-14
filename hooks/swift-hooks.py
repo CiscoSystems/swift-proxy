@@ -115,9 +115,10 @@ def proxy_changed():
     account_port = utils.config_get('account-ring-port')
     object_port = utils.config_get('object-ring-port')
     container_port = utils.config_get('container-ring-port')
+    zone = swift.get_zone(utils.config_get('zone-assignment'))
     node_settings = {
         'ip': utils.get_host_ip(utils.relation_get('private-address')),
-        'zone': utils.relation_get('zone'),
+        'zone': zone,
         'account_port': utils.relation_get('account_port'),
         'object_port': utils.relation_get('object_port'),
         'container_port': utils.relation_get('container_port'),

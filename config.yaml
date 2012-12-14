@@ -33,17 +33,19 @@ options:
     default: 1
     type: int
     description: Minimum hours between balances
-  storage-zone-distribution:
-    default: "service-unit"
+  zone-assignment:
+    default: "manual"
     type: string
     description: |
-      Storage zone distribution policy that the charm will use when
-      configuring and initializing the storage ring upon new swift-storage
-      relations (see README). Options include:
+      Which policy to use when assigning new storage nodes to zones.
       .
-        service-unit - Storage zones configured per swift-storage service unit.
-        machine-unit - Storage zones configured per swift-storage machine-unit.
-        manual - Storage zones configured manually per swift-storage service.
+        manual - Allow swift-storage services to request zone membership.
+        auto - Assign new swift-storage units to zones automatically.
+      .
+      The configured replica minimum must be met by an equal number of storage
+      zones before the storage ring will be initially balance.  Deployment
+      requirements differ based on the zone-assignment policy configured, see
+      this charm's README for details.
   # CA Cert info
   use-https:
     default: "yes"

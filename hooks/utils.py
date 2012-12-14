@@ -34,7 +34,7 @@ def install(*pkgs):
         cmd.append(pkg)
     subprocess.check_call(cmd)
 
-TEMPLATES_DIR = 'templates'
+TEMPLATES_DIR = 'hooks/templates'
 
 try:
     import jinja2

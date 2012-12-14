@@ -95,6 +95,7 @@ def render_config(config_file, context):
     # load os release-specific templates.
     cfile = os.path.basename(config_file)
     templates_dir = os.path.join(utils.TEMPLATES_DIR, os_release)
+    context['os_release'] = os_release
     return utils.render_template(cfile, context, templates_dir)
 
 
@@ -157,6 +158,8 @@ def get_keystone_auth():
 
 
 def write_proxy_config():
+
+    bind_port = utils.config_get('bind-port')
     workers = utils.config_get('workers')
     if workers == '0':
         import multiprocessing
@@ -164,7 +167,7 @@ def write_proxy_config():
 
     ctxt = {
         'proxy_ip': utils.get_host_ip(),
-        'bind_port': utils.config_get('bind-port'),
+        'bind_port': bind_port,
         'workers': workers,
         'operator_roles': utils.config_get('operator-roles')
     }
@@ -179,12 +182,14 @@ def write_proxy_config():
     ks_auth = get_keystone_auth()
     if ks_auth:
         utils.juju_log('INFO', 'Enabling Keystone authentication.')
-        ctxt = (ctxt.items() + ks_auth.items())
+        for k, v in ks_auth.iteritems():
+            ctxt[k] = v
 
     with open(SWIFT_PROXY_CONF, 'w') as conf:
         conf.write(render_config(SWIFT_PROXY_CONF, ctxt))
 
     proxy_control('restart')
+    subprocess.check_call(['open-port', bind_port])
 
 def configure_ssl():
     # this should be expanded to cover setting up user-specified certificates
@@ -247,8 +252,8 @@ def exists_in_ring(ring_path, node):
     node['port'] = ring_port(ring_path, node)
 
     for dev in ring['devs']:
-        d = [(i, dev[i]) for i in dev if i in node]
-        n = [(i, node[i]) for i in node if i in dev]
+        d = [(i, dev[i]) for i in dev if i in node and i != 'zone']
+        n = [(i, node[i]) for i in node if i in dev and i != 'zone']
         if sorted(d) == sorted(n):
 
             msg = 'Node already exists in ring (%s).' % ring_path
@@ -284,18 +289,50 @@ def add_to_ring(ring_path, node):
     utils.juju_log('INFO', msg)
 
 
-def determine_zone(policy):
-    '''Determine which storage zone a specific machine unit belongs to based
-       on configured storage-zone-distrbution policy.'''
-    if policy == 'service-unit':
-        this_relid = os.getenv('JUJU_RELATION_ID')
-        relids = utils.relation_ids('swift-proxy')
-        zone = (relids.index(this_relid) + 1)
-    elif policy == 'machine-unit':
-        pass
-    elif policy == 'manual':
-        zone = utils.relation_get('zone')
-    return zone
+def _get_zone(ring_builder):
+    replicas = ring_builder.replicas
+    zones = [d['zone'] for d in ring_builder.devs]
+    if not zones:
+        return 1
+    if len(zones) < replicas:
+        return sorted(zones).pop() + 1
+
+    zone_distrib = {}
+    for z in zones:
+        zone_distrib[z] = zone_distrib.get(z, 0) + 1
+
+    if len(set([total for total in zone_distrib.itervalues()])) == 1:
+        # all zones are equal, start assigning to zone 1 again.
+        return 1
+
+    return sorted(zone_distrib, key=zone_distrib.get).pop(0)
+
+
+def get_zone(assignment_policy):
+    ''' Determine the appropriate zone depending on configured assignment
+        policy.
+
+        Manual assignment relies on each storage zone being deployed as a
+        separate service unit with its desired zone set as a configuration
+        option.
+
+        Auto assignment distributes swift-storage machine units across a number
+        of zones equal to the configured minimum replicas.  This allows for a
+        single swift-storage service unit, with each 'add-unit'd machine unit
+        being assigned to a different zone.
+    '''
+    if assignment_policy == 'manual':
+        return utils.relation_get('zone')
+    elif assignment_policy == 'auto':
+        potential_zones = []
+        for ring in SWIFT_RINGS.itervalues():
+            builder = _load_builder(ring)
+            potential_zones.append(_get_zone(builder))
+        return set(potential_zones).pop()
+    else:
+        utils.juju_log('Invalid zone assignment policy: %s' %\
+                       assignemnt_policy)
+        sys.exit(1)
 
 
 def balance_ring(ring_path):
