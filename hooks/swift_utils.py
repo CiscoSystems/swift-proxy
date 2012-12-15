@@ -375,9 +375,8 @@ def write_apache_config():
     for relid in utils.relation_ids('swift-proxy'):
         for unit in utils.relation_list(relid):
             host = utils.relation_get('private-address', unit, relid)
-            allowed_hosts.append(host)
-    # testing
-    allowed_hosts.append('10.0.0.3')
+            allowed_hosts.append(utils.get_host_ip(host))
+
     ctxt = { 'www_dir': WWW_DIR, 'allowed_hosts': allowed_hosts }
     with open(APACHE_CONF, 'w') as conf:
         conf.write(render_config(APACHE_CONF, ctxt))
