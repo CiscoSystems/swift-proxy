@@ -106,12 +106,12 @@ def balance_rings():
     trigger = uuid.uuid4()
     swift_hash = swift.get_swift_hash()
     # notify storage nodes that there is a new ring to fetch.
-    for relid in utils.relation_ids('swift-proxy'):
+    for relid in utils.relation_ids('swift-storage'):
         utils.relation_set(rid=relid, swift_hash=swift_hash,
                            www_dir=www_dir, trigger=trigger)
     swift.proxy_control('restart')
 
-def proxy_changed():
+def storage_changed():
     account_port = utils.config_get('account-ring-port')
     object_port = utils.config_get('object-ring-port')
     container_port = utils.config_get('container-ring-port')
@@ -124,7 +124,7 @@ def proxy_changed():
         'container_port': utils.relation_get('container_port'),
     }
     if None in node_settings.itervalues():
-        utils.juju_log('INFO', 'proxy_changed: Relation not ready.')
+        utils.juju_log('INFO', 'storage_changed: Relation not ready.')
         return None
 
     for k in ['zone', 'account_port', 'object_port', 'container_port']:
@@ -144,7 +144,7 @@ def proxy_changed():
     if swift.should_balance([r for r in swift.SWIFT_RINGS.itervalues()]):
         balance_rings()
 
-def proxy_broken():
+def storage_broken():
     swift.write_apache_config()
 
 def config_changed():
@@ -159,8 +159,8 @@ hooks = {
     'config-changed': config_changed,
     'identity-service-relation-joined': keystone_joined,
     'identity-service-relation-changed': keystone_changed,
-    'swift-proxy-relation-changed': proxy_changed,
-    'swift-proxy-relation-broken': proxy_broken,
+    'swift-storage-relation-changed': storage_changed,
+    'swift-storage-relation-broken': storage_broken,
 }
 
 utils.do_hooks(hooks)

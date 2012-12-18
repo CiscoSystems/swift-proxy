@@ -372,7 +372,7 @@ def write_apache_config():
     utils.juju_log('INFO', 'Updating %s.' % APACHE_CONF)
 
     allowed_hosts = []
-    for relid in utils.relation_ids('swift-proxy'):
+    for relid in utils.relation_ids('swift-storage'):
         for unit in utils.relation_list(relid):
             host = utils.relation_get('private-address', unit, relid)
             allowed_hosts.append(utils.get_host_ip(host))
