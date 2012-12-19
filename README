@@ -30,7 +30,7 @@ settings can be left as default.
 
 a. Zone Assignment
 
-This setting determines how the charm assignes new storage nodes to storage
+This setting determines how the charm assigns new storage nodes to storage
 zones.
 
 The default, 'manual' option is suggested for production as it allows
@@ -75,7 +75,7 @@ zones to meet its minimum replica requirement, in this case 3.
 
 The other option for zone assignment is 'auto.'  In this mode, swift-proxy
 gets a relation to a single swift-storage service unit.  Each machine unit
-assinged to that service unit will be distributed evenly across zones.
+assigned to that service unit will be distributed evenly across zones.
 
     $ cat >swift.cfg <<END
     swift-proxy:
@@ -118,9 +118,9 @@ dependencies.  See Swift documentation for details.
 
 The charm may also be configured to use Keystone, either manually (via config)
 or automatically via a relation to an existing Keystone service.  The latter is
-prefered, however, if a Keystone service is desired but it is not managed by
+preferred, however, if a Keystone service is desired but it is not managed by
 Juju, the configuration for the auth token middleware can be set manually via
-the charm's config.  A relation to a Keysone server via the identity-service
+the charm's config.  A relation to a Keystone server via the identity-service
 interface is will configure swift-proxy with the appropriate credentials
 to make use of Keystone and is required for any integration with other
 OpenStack components.
