@@ -51,6 +51,7 @@ def install():
     # configure a directory on webserver for distributing rings.
     if not os.path.isdir(swift.WWW_DIR):
         os.mkdir(swift.WWW_DIR, 0755)
+    uid, gid = swift.swift_user()
     os.chown(swift.WWW_DIR, uid, gid)
     swift.write_apache_config()
 
