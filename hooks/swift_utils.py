@@ -143,7 +143,7 @@ def get_keystone_auth():
             ks_auth = {
                 'auth_type': 'keystone',
                 'auth_protocol': 'http',
-                'keystone_host': utils.relation_get('private-address',
+                'keystone_host': utils.relation_get('auth_host',
                                                     unit, relid),
                 'auth_port': utils.relation_get('auth_port', unit, relid),
                 'service_user': utils.relation_get('service_username', unit, relid),
