@@ -20,12 +20,6 @@ def install():
     pkgs = swift.determine_packages(rel)
     utils.install(*pkgs)
 
-    uid, gid = swift.swift_user()
-    conf_dir = os.path.dirname(swift.SWIFT_CONF)
-    if not os.path.isdir(conf_dir):
-        os.mkdir(conf_dir, 0750)
-    os.chown(conf_dir, uid, gid)
-
     swift.ensure_swift_dir()
 
     # initialize swift configs.
