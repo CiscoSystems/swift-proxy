@@ -8,8 +8,7 @@ those are also managed by Juju.  For Swift to function, you'll also need to
 deploy additional swift-storage nodes using the cs:precise/swift-storage
 charm.
 
-For more information about Swift and its architecture, visit the official
-project website at http://swift.openstack.org.
+For more information about Swift and its architecture, visit the [official project website](http://swift.openstack.org)
 
 This charm was developed to support deploying multiple version of Swift on
 Ubuntu Precise 12.04, as they relate to the release series of OpenStack.  That
@@ -28,7 +27,7 @@ describes how to select the appropriate zone assignment policy, as well as
 a few other configuration settings of interest.  Many of the configuration
 settings can be left as default.
 
-a. Zone Assignment
+**Zone Assignment**
 
 This setting determines how the charm assigns new storage nodes to storage
 zones.
@@ -42,18 +41,18 @@ swift-proxy charm accordingly.  Using the cs:precise/swift-storage charm with
 this charm, a deployment would look something like:
 
     $ cat >swift.cfg <<END
-    swift-proxy:
-        zone-assignment: manual
-        replicas: 3
-    swift-storage-zone1:
-        zone: 1
-        block-device: sdb
-    swift-storage-zone1:
-        zone: 2
-        block-device: sdb
-    swift-storage-zone1:
-        zone: 3
-        block-device: sdb
+        swift-proxy:
+            zone-assignment: manual
+            replicas: 3
+        swift-storage-zone1:
+            zone: 1
+            block-device: sdb
+        swift-storage-zone1:
+            zone: 2
+            block-device: sdb
+        swift-storage-zone1:
+            zone: 3
+            block-device: sdb
     END
     $ juju deploy --config=swift.cfg swift-proxy
     $ juju deploy --config=swift.cfg swift-storage swift-storage-zone1
@@ -103,14 +102,14 @@ single service unit.  New units will be distributed across the existing zones.
     # swift-storage/4 is assigned to zone 2.
     etc.
 
-b. Installation repository.
+**Installation repository.**
 
 The 'openstack-origin' setting allows Swift to be installed from installation
 repositories and can be used to setup access to the Ubuntu Cloud Archive
 to support installing Swift versions more recent than what is shipped with
 Ubuntu 12.04 (1.4.8).  For more information, see config.yaml.
 
-c. Authentication.
+**Authentication.**
 
 By default, the charm will be deployed using the tempauth auth system.  This is
 a simple and not-recommended auth system that functions without any external
@@ -125,7 +124,7 @@ interface is will configure swift-proxy with the appropriate credentials
 to make use of Keystone and is required for any integration with other
 OpenStack components.
 
-d. Glance
+**Glance**
 
 Swift may be used to as a storage backend for the Glance image service.  To do
 so, simply add a relation between swift-proxy and an existing Glance service
