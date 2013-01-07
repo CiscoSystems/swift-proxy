@@ -1,8 +1,25 @@
 options:
-  swift-release:
+  openstack-origin:
     default: distro
     type: string
-    description: Swift PPA to configure (trunk, milestone, distro)
+    description: |
+      Repository from which to install.  May be one of the following:
+      distro (default), ppa:somecustom/ppa, a deb url sources entry,
+      or a supported Cloud Archive release pocket.
+      .
+      Supported Cloud Archive sources include:
+        - cloud:precise-folsom,
+        - cloud:precise-folsom/updates
+        - cloud:precise-folsom/staging
+        - cloud:precise-folsom/proposed
+      .
+      Note that updating this setting to a source that is known to
+      provide a later version of OpenStack will trigger a software
+      upgrade.
+  region:
+    default: RegionOne
+    type: string
+    description: OpenStack region that this swift-proxy supports.
   # Ring configuration
   partition-power:
     default: 8
@@ -16,10 +33,23 @@ options:
     default: 1
     type: int
     description: Minimum hours between balances
+  zone-assignment:
+    default: "manual"
+    type: string
+    description: |
+      Which policy to use when assigning new storage nodes to zones.
+      .
+        manual - Allow swift-storage services to request zone membership.
+        auto - Assign new swift-storage units to zones automatically.
+      .
+      The configured replica minimum must be met by an equal number of storage
+      zones before the storage ring will be initially balance.  Deployment
+      requirements differ based on the zone-assignment policy configured, see
+      this charm's README for details.
   # CA Cert info
   use-https:
-    default: 1
-    type: int
+    default: "yes"
+    type: string
     description: Whether to listen on HTTPS
   country:
     default: US
@@ -45,10 +75,15 @@ options:
     default: 0
     type: int
     description: Number of TCP workers to launch (0 for the number of system cores)
+  operator-roles:
+    default: "Member,Admin"
+    type: string
+    description: Comma-separated list of Swift operator roles.
   auth-type:
     default: tempauth
     type: string
     description: Auth method to use, tempauth or keystone
+  # Manual Keystone configuration.
   keystone-auth-host:
     type: string
     description: Keystone authentication host

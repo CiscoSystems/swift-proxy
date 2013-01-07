@@ -1,0 +1,7 @@
+<Directory {{ www_dir }}>
+    Order deny,allow
+{% for host in allowed_hosts %}
+    Allow from {{ host }}
+{% endfor %}
+    Deny from all
+</Directory>
