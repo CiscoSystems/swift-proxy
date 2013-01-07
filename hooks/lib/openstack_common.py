@@ -30,8 +30,6 @@ swift_codenames = {
 }
 
 def juju_log(msg):
-    print msg
-    return
     subprocess.check_call(['juju-log', msg])
 
 
