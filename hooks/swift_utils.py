@@ -87,6 +87,8 @@ def determine_packages(release):
         return BASE_PACKAGES
     elif release == 'folsom':
         return FOLSOM_PACKAGES
+    elif release == 'grizzly':
+        return FOLSOM_PACKAGES
 
 
 def render_config(config_file, context):
