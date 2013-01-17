@@ -26,7 +26,8 @@ openstack_codenames = {
 swift_codenames = {
     '1.4.3': 'diablo',
     '1.4.8': 'essex',
-    '1.7.4': 'folsom'
+    '1.7.4': 'folsom',
+    '1.7.5': 'grizzly'
 }
 
 def juju_log(msg):
