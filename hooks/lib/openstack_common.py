@@ -135,6 +135,21 @@ def get_os_codename_package(pkg):
         error_out(e)
 
 
+def get_os_version_package(pkg):
+    '''Derive OpenStack version number from an installed package.'''
+    codename = get_os_codename_package(pkg)
+
+    if 'swift' in pkg:
+        vers_map = swift_codenames
+    else:
+        vers_map = openstack_codenames
+
+    for version, cname in vers_map.iteritems():
+        if cname == codename:
+            return version
+    e = "Could not determine OpenStack version for package: %s" % pkg
+    error_out(e)
+
 def configure_installation_source(rel):
     '''Configure apt installation source.'''
 
@@ -175,9 +190,11 @@ def configure_installation_source(rel):
                 'version (%s)' % (ca_rel, ubuntu_rel)
             error_out(e)
 
-        if ca_rel == 'folsom/staging':
+        if 'staging' in ca_rel:
             # staging is just a regular PPA.
-            cmd = 'add-apt-repository -y ppa:ubuntu-cloud-archive/folsom-staging'
+            os_rel = ca_rel.split('/')[0]
+            ppa = 'ppa:ubuntu-cloud-archive/%s-staging' % os_rel
+            cmd = 'add-apt-repository -y %s' % ppa
             subprocess.check_call(cmd.split(' '))
             return
 
@@ -185,7 +202,10 @@ def configure_installation_source(rel):
         pockets = {
             'folsom': 'precise-updates/folsom',
             'folsom/updates': 'precise-updates/folsom',
-            'folsom/proposed': 'precise-proposed/folsom'
+            'folsom/proposed': 'precise-proposed/folsom',
+            'grizzly': 'precise-updates/grizzly',
+            'grizzly/updates': 'precise-updates/grizzly',
+            'grizzly/proposed': 'precise-proposed/grizzly'
         }
 
         try:
@@ -201,4 +221,3 @@ def configure_installation_source(rel):
             f.write(src)
     else:
         error_out("Invalid openstack-release specified: %s" % rel)
-
