@@ -35,7 +35,7 @@ zones.
 The default, 'manual' option is suggested for production as it allows
 administrators to carefully architect the storage cluster.  It requires each
 swift-storage service to be deployed with an explicit storage zone configured
-in its deployment settings..  Upon relation to a swift-proxy, the storage node
+in its deployment settings.  Upon relation to a swift-proxy, the storage node
 will request membership to its configured zone and be assigned by the
 swift-proxy charm accordingly.  Using the cs:precise/swift-storage charm with
 this charm, a deployment would look something like:
@@ -47,10 +47,10 @@ this charm, a deployment would look something like:
         swift-storage-zone1:
             zone: 1
             block-device: sdb
-        swift-storage-zone1:
+        swift-storage-zone2:
             zone: 2
             block-device: sdb
-        swift-storage-zone1:
+        swift-storage-zone3:
             zone: 3
             block-device: sdb
     END
@@ -67,12 +67,12 @@ node.  To expand capacity of the storage system, nodes can be added to specific
 zones in the ring.
 
     $ juju add-unit swift-storage-zone1
-    $ juju add-unit -n5 swift-storage-zone3
+    $ juju add-unit -n5 swift-storage-zone3    # Adds 5 units to zone3
 
 This charm will not balance the storage ring until there are enough storage
 zones to meet its minimum replica requirement, in this case 3.
 
-The other option for zone assignment is 'auto.'  In this mode, swift-proxy
+The other option for zone assignment is 'auto'.  In this mode, swift-proxy
 gets a relation to a single swift-storage service unit.  Each machine unit
 assigned to that service unit will be distributed evenly across zones.
 
@@ -83,6 +83,7 @@ assigned to that service unit will be distributed evenly across zones.
     swift-storage:
         zone: 1
         block-device: sdb
+    END
     $ juju deploy --config=swift.cfg swift-proxy
     $ juju deploy --config=swift.cfg swift-storage
     $ juju add-relation swift-proxy swift-storage
@@ -116,13 +117,13 @@ a simple and not-recommended auth system that functions without any external
 dependencies.  See Swift documentation for details.
 
 The charm may also be configured to use Keystone, either manually (via config)
-or automatically via a relation to an existing Keystone service.  The latter is
-preferred, however, if a Keystone service is desired but it is not managed by
-Juju, the configuration for the auth token middleware can be set manually via
-the charm's config.  A relation to a Keystone server via the identity-service
-interface is will configure swift-proxy with the appropriate credentials
-to make use of Keystone and is required for any integration with other
-OpenStack components.
+or automatically via a relation to an existing Keystone service using the
+cs:precise/keystone charm.  The latter is preferred, however, if a Keystone
+service is desired but it is not managed by Juju, the configuration for the
+auth token middleware can be set manually via the charm's config.  A relation
+to a Keystone server via the identity-service interface will configure
+swift-proxy with the appropriate credentials to make use of Keystone and is
+required for any integration with other OpenStack components.
 
 **Glance**
 
