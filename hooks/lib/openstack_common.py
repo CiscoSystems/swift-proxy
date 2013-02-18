@@ -27,6 +27,7 @@ swift_codenames = {
     '1.4.3': 'diablo',
     '1.4.8': 'essex',
     '1.7.4': 'folsom',
+    '1.7.6': 'grizzly',
     '1.7.7': 'grizzly'
 }
 
@@ -69,7 +70,7 @@ def get_os_codename_install_source(src):
         return ca_rel
 
     # Best guess match based on deb string provided
-    if src.startswith('deb'):
+    if src.startswith('deb') or src.startswith('ppa'):
         for k, v in openstack_codenames.iteritems():
             if v in src:
                 return v
