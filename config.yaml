@@ -106,6 +106,9 @@ options:
     type: string
     description: Keystone admin password
   # HA configuration settings
+  swift-hash:
+    type: string
+    description: Hash to use across all swift-proxy servers - don't loose
   vip:
     type: string
     description: "Virtual IP to use to front swift-proxy in ha configuration"

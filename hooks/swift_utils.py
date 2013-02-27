@@ -105,6 +105,10 @@ def get_swift_hash():
     if os.path.isfile(SWIFT_HASH_FILE):
         with open(SWIFT_HASH_FILE, 'r') as hashfile:
             swift_hash = hashfile.read().strip()
+    elif utils.config_get('swift-hash'):
+        swift_hash = utils.config_get('swift-hash')
+        with open(SWIFT_HASH_FILE, 'w') as hashfile:
+            hashfile.write(swift_hash)
     else:
         cmd = ['od', '-t', 'x8', '-N', '8', '-A', 'n']
         rand = open('/dev/random', 'r')
