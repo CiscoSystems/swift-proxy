@@ -1,0 +1,15 @@
+#!/bin/bash
+# Validate that service is running
+HEALTH_DIR=`dirname $0`
+SCRIPTS_DIR=`dirname $HEALTH_DIR`
+. $SCRIPTS_DIR/scriptrc
+set -e
+
+# Grab any OPENSTACK_SWIFT_SERVICE* environment variables
+openstack_service_names=`env| awk -F '=' '(/OPENSTACK_SWIFT_SERVICE/){print $2}'`
+for service_name in $openstack_service_names
+do
+    # Double-negative: we want to ensure swift-init does not return
+    # 'No <service_name> running'
+    swift-init $service_name status 2>/dev/null | grep -vq "No $service_name running"
+done

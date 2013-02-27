@@ -167,6 +167,11 @@ def write_proxy_config():
         import multiprocessing
         workers = multiprocessing.cpu_count()
 
+    env_vars = {'OPENSTACK_SERVICE_SWIFT': 'proxy-server',
+                'OPENSTACK_PORT_API': bind_port,
+                'OPENSTACK_PORT_MEMCACHED': 11211}
+    openstack.save_script_rc(**env_vars)
+
     ctxt = {
         'proxy_ip': utils.get_host_ip(),
         'bind_port': bind_port,
