@@ -63,7 +63,7 @@ def install():
 
 
 def keystone_joined(relid=None):
-    if is_clustered():
+    if utils.is_clustered():
         hostname = utils.config_get('vip')
     else:
         hostname = utils.unit_get('private-address')
@@ -102,17 +102,17 @@ def balance_rings():
         shutil.copyfile(os.path.join(swift.SWIFT_CONF_DIR, f),
                         os.path.join(swift.WWW_DIR, f))
 
-    if eligible_leader():
-      msg = 'Broadcasting notification to all storage nodes that new '\
-            'ring is ready for consumption.'
-      utils.juju_log('INFO', msg)
-      www_dir = swift.WWW_DIR.split('/var/www/')[1]
-      trigger = uuid.uuid4()
-      swift_hash = swift.get_swift_hash()
-      # notify storage nodes that there is a new ring to fetch.
-      for relid in utils.relation_ids('swift-storage'):
-          utils.relation_set(rid=relid, swift_hash=swift_hash,
-                             www_dir=www_dir, trigger=trigger)
+    if utils.eligible_leader():
+        msg = 'Broadcasting notification to all storage nodes that new '\
+              'ring is ready for consumption.'
+        utils.juju_log('INFO', msg)
+        www_dir = swift.WWW_DIR.split('/var/www/')[1]
+        trigger = uuid.uuid4()
+        swift_hash = swift.get_swift_hash()
+        # notify storage nodes that there is a new ring to fetch.
+        for relid in utils.relation_ids('swift-storage'):
+            utils.relation_set(rid=relid, swift_hash=swift_hash,
+                               www_dir=www_dir, trigger=trigger)
 
     swift.proxy_control('restart')
 
@@ -168,29 +168,31 @@ SERVICE_PORTS = {
         ]
     }
 
+
 def cluster_changed():
     cluster_hosts = {}
-    cluster_hosts[os.getenv('JUJU_UNIT_NAME').replace('/','-')] = \
-        utils.util_get('private-address')
-    for r_id in relation_ids('cluster'):
-        for unit in relation_list(r_id):
-            cluster_hosts[unit.replace('/','-')] = \
+    cluster_hosts[os.getenv('JUJU_UNIT_NAME').replace('/', '-')] = \
+        utils.unit_get('private-address')
+    for r_id in utils.relation_ids('cluster'):
+        for unit in utils.relation_list(r_id):
+            cluster_hosts[unit.replace('/', '-')] = \
                 utils.relation_get(attribute='private-address',
                                    rid=r_id,
                                    unit=unit)
-    configure_haproxy(cluster_hosts,
-                      SERVICE_PORTS)
+    openstack.configure_haproxy(cluster_hosts,
+                                SERVICE_PORTS)
     utils.restart('haproxy')
 
 
 def ha_relation_changed():
     clustered = utils.relation_get('clustered')
-    if clustered and is_leader():
-        juju_log('Cluster configured, notifying other services and updating'
-                 'keystone endpoint configuration')
+    if clustered and utils.is_leader():
+        utils.juju_log('INFO',
+                       'Cluster configured, notifying other services and'
+                       'updating keystone endpoint configuration')
         # Tell all related services to start using
         # the VIP and haproxy ports instead
-        for r_id in relation_ids('identity-service'):
+        for r_id in utils.relation_ids('identity-service'):
             keystone_joined(relid=r_id)
 
 
