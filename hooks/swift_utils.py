@@ -169,7 +169,7 @@ def write_proxy_config():
 
     ctxt = {
         'proxy_ip': utils.get_host_ip(),
-        'bind_port': bind_port,
+        'bind_port': bind_port - 10,  # Drop -10 as behind haproxy
         'workers': workers,
         'operator_roles': utils.config_get('operator-roles')
     }

@@ -18,10 +18,12 @@ def do_hooks(hooks):
     hook = os.path.basename(sys.argv[0])
 
     try:
-        hooks[hook]()
+        hook_func = hooks[hook]
     except KeyError:
         juju_log('INFO',
                  "This charm doesn't know how to handle '{}'.".format(hook))
+    else:
+        hook_func()
 
 
 def install(*pkgs):
@@ -203,23 +205,24 @@ def config_get(attribute):
     except KeyError:
         return None
 
+
 def get_unit_hostname():
     return socket.gethostname()
 
 
 def get_host_ip(hostname=unit_get('private-address')):
     try:
-      # Test to see if already an IPv4 address
-      socket.inet_aton(hostname)
-      return hostname
+        # Test to see if already an IPv4 address
+        socket.inet_aton(hostname)
+        return hostname
     except socket.error:
-      try:
-        answers = dns.resolver.query(hostname, 'A')
-        if answers:
-          return answers[0].address
-      except dns.resolver.NXDOMAIN:
-        pass
-      return None
+        try:
+            answers = dns.resolver.query(hostname, 'A')
+            if answers:
+                return answers[0].address
+        except dns.resolver.NXDOMAIN:
+            pass
+    return None
 
 
 def restart(*services):
@@ -235,3 +238,65 @@ def stop(*services):
 def start(*services):
     for service in services:
         subprocess.check_call(['service', service, 'start'])
+
+
+def reload(*services):
+    for service in services:
+        subprocess.check_call(['service', service, 'reload'])
+
+
+def is_clustered():
+    for r_id in (relation_ids('ha') or []):
+        for unit in (relation_list(r_id) or []):
+            clustered = relation_get('clustered',
+                                     rid=r_id,
+                                     unit=unit)
+            if clustered:
+                return True
+    return False
+
+
+def is_leader():
+    cmd = [
+        "crm", "resource",
+        "show", "res_swift_vip"
+        ]
+    try:
+        status = subprocess.check_output(cmd)
+    except subprocess.CalledProcessError:
+        return False
+    else:
+        if get_unit_hostname() in status:
+            return True
+        else:
+            return False
+
+
+def peer_units():
+    peers = []
+    for r_id in (relation_ids('cluster') or []):
+        for unit in (relation_list(r_id) or []):
+            peers.append(unit)
+    return peers
+
+
+def oldest_peer(peers):
+    local_unit_no = os.getenv('JUJU_UNIT_NAME').split('/')[1]
+    for peer in peers:
+        remote_unit_no = peer.split('/')[1]
+        if remote_unit_no < local_unit_no:
+            return False
+    return True
+
+
+def eligible_leader():
+    if is_clustered():
+        if not is_leader():
+            juju_log('INFO', 'Deferring action to CRM leader.')
+            return False
+    else:
+        peers = peer_units()
+        if peers and not oldest_peer(peers):
+            juju_log('INFO', 'Deferring action to oldest service unit.')
+            return False
+    return True
