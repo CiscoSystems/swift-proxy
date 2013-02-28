@@ -242,7 +242,12 @@ def start(*services):
 
 def reload(*services):
     for service in services:
-        subprocess.check_call(['service', service, 'reload'])
+        try:
+            subprocess.check_call(['service', service, 'reload'])
+        except subprocess.CalledProcessError:
+            # Reload failed - either service does not support reload
+            # or it was not running - restart will fixup most things
+            subprocess.check_call(['service', service, 'restart'])
 
 
 def is_clustered():

@@ -180,7 +180,7 @@ def cluster_changed():
                                    unit=unit)
     openstack.configure_haproxy(cluster_hosts,
                                 SERVICE_PORTS)
-    utils.restart('haproxy')
+    utils.reload('haproxy')
 
 
 def ha_relation_changed():
