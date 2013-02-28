@@ -2,6 +2,7 @@
 
 # Common python helper functions used for OpenStack charms.
 
+import os
 import subprocess
 
 CLOUD_ARCHIVE_URL = "http://ubuntu-cloud.archive.canonical.com/ubuntu"
