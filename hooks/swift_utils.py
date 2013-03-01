@@ -173,17 +173,12 @@ def write_proxy_config():
 
     ctxt = {
         'proxy_ip': utils.get_host_ip(),
-        'bind_port': bind_port - 10,  # Drop -10 as behind haproxy
+        'bind_port': utils.determine_api_port(bind_port),
         'workers': workers,
         'operator_roles': utils.config_get('operator-roles')
     }
 
-    if utils.config_get('use-https') == 'no':
-        ctxt['ssl'] = False
-    else:
-        ctxt['ssl'] = True
-        ctxt['ssl_cert'] = SSL_CERT
-        ctxt['ssl_key'] = SSL_KEY
+    ctxt['ssl'] = False
 
     ks_auth = get_keystone_auth()
     if ks_auth:

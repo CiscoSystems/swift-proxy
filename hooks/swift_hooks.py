@@ -60,6 +60,7 @@ def install():
     uid, gid = swift.swift_user()
     os.chown(swift.WWW_DIR, uid, gid)
     swift.write_apache_config()
+    utils.configure_https()
 
 
 def keystone_joined(relid=None):
@@ -87,6 +88,7 @@ def keystone_joined(relid=None):
 
 def keystone_changed():
     swift.write_proxy_config()
+    utils.configure_https()
 
 
 def balance_rings():
@@ -157,30 +159,19 @@ def config_changed():
         for relid in relids:
             keystone_joined(relid)
     swift.write_proxy_config()
-    cluster_changed()
-
-
-SERVICE_PORTS = {
-    "swift": [
-        utils.config_get('bind-port'),
-        int(utils.config_get('bind-port')) - 10
-        ]
-    }
+    utils.configure_https()
 
 
 def cluster_changed():
-    cluster_hosts = {}
-    cluster_hosts[os.getenv('JUJU_UNIT_NAME').replace('/', '-')] = \
-        utils.unit_get('private-address')
-    for r_id in utils.relation_ids('cluster'):
-        for unit in utils.relation_list(r_id):
-            cluster_hosts[unit.replace('/', '-')] = \
-                utils.relation_get(attribute='private-address',
-                                   rid=r_id,
-                                   unit=unit)
-    openstack.configure_haproxy(cluster_hosts,
-                                SERVICE_PORTS)
-    utils.reload('haproxy')
+    api_port = utils.config_get('bind-port')
+    service_ports = {
+        "swift": [
+            utils.determine_haproxy_port(api_port),
+            utils.determine_api_port(api_port)
+            ]
+        }
+    swift.proxy_control('restart')
+    utils.configure_haproxy(service_ports)
 
 
 def ha_relation_changed():
@@ -190,7 +181,7 @@ def ha_relation_changed():
                        'Cluster configured, notifying other services and'
                        'updating keystone endpoint configuration')
         # Tell all related services to start using
-        # the VIP and haproxy ports instead
+        # the VIP instead
         for r_id in utils.relation_ids('identity-service'):
             keystone_joined(relid=r_id)
 
