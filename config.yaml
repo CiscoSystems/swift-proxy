@@ -48,7 +48,7 @@ options:
       this charm's README for details.
   # CA Cert info
   use-https:
-    default: "yes"
+    default: "no"
     type: string
     description: Whether to listen on HTTPS
   country:
