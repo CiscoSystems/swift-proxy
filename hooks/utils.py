@@ -482,7 +482,7 @@ def determine_api_port(public_port):
     returns: int: the correct listening port for the API service
     '''
     i = 0
-    if len(peer_units) >= 0 and is_clustered():
+    if len(peer_units()) > 0 and is_clustered():
         i += 1
         if https():
             i += 1

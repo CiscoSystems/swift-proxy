@@ -399,7 +399,7 @@ def configure_haproxy():
 def configure_https():
     if utils.https():
         api_port = utils.config_get('bind-port')
-        if (len(utils.peer_units) > 0 or
+        if (len(utils.peer_units()) > 0 or
             utils.is_clustered()):
             target_port = utils.determine_haproxy_port(api_port)
             configure_haproxy()
