@@ -44,9 +44,6 @@ def install():
     with open(swift.MEMCACHED_CONF, 'w') as conf:
         conf.write(swift.render_config(swift.MEMCACHED_CONF, ctxt))
 
-    # generate or setup SSL certificate
-    swift.configure_ssl()
-
     # initialize new storage rings.
     for ring in swift.SWIFT_RINGS.iteritems():
         swift.initialize_ring(ring[1],
@@ -60,7 +57,7 @@ def install():
     uid, gid = swift.swift_user()
     os.chown(swift.WWW_DIR, uid, gid)
     swift.write_apache_config()
-    utils.configure_https()
+    swift.configure_https()
 
 
 def keystone_joined(relid=None):
@@ -71,8 +68,7 @@ def keystone_joined(relid=None):
     else:
         hostname = utils.unit_get('private-address')
     port = utils.config_get('bind-port')
-    ssl = utils.config_get('use-https')
-    if ssl == 'yes':
+    if utils.https():
         proto = 'https'
     else:
         proto = 'http'
@@ -88,7 +84,10 @@ def keystone_joined(relid=None):
 
 def keystone_changed():
     swift.write_proxy_config()
-    utils.configure_https()
+    swift.configure_https()
+    # Re-fire keystone hooks to ripple back the HTTPS service entry
+    for relid in utils.relation_ids('identity-service'):
+        keystone_joined(relid=relid)
 
 
 def balance_rings():
@@ -159,19 +158,11 @@ def config_changed():
         for relid in relids:
             keystone_joined(relid)
     swift.write_proxy_config()
-    utils.configure_https()
+    swift.configure_https()
 
 
 def cluster_changed():
-    api_port = utils.config_get('bind-port')
-    service_ports = {
-        "swift": [
-            utils.determine_haproxy_port(api_port),
-            utils.determine_api_port(api_port)
-            ]
-        }
-    swift.proxy_control('restart')
-    utils.configure_haproxy(service_ports)
+    swift.configure_haproxy()
 
 
 def ha_relation_changed():

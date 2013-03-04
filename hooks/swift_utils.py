@@ -383,3 +383,30 @@ def write_apache_config():
         conf.write(render_config(APACHE_CONF, ctxt))
     subprocess.check_call(['service', 'apache2', 'reload'])
 
+
+def configure_haproxy():
+    api_port = utils.config_get('bind-port')
+    service_ports = {
+        "swift": [
+            utils.determine_haproxy_port(api_port),
+            utils.determine_api_port(api_port)
+            ]
+        }
+    write_proxy_config()
+    utils.configure_haproxy(service_ports)
+
+
+def configure_https():
+    if utils.https():
+        api_port = utils.config_get('bind-port')
+        if (len(utils.peer_units) > 0 or
+            utils.is_clustered()):
+            target_port = utils.determine_haproxy_port(api_port)
+            configure_haproxy()
+        else:
+            target_port = utils.determine_api_port(api_port)
+            write_proxy_config()
+        utils.setup_https(namespace="swift",
+                          port_maps={api_port: target_port})
+    else:
+        return False

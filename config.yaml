@@ -46,6 +46,17 @@ options:
       zones before the storage ring will be initially balance.  Deployment
       requirements differ based on the zone-assignment policy configured, see
       this charm's README for details.
+  # User provided SSL cert and key
+  ssl_cert:
+    type: string
+    description: |
+      SSL certificate to install and use for API ports.  Setting this value
+      and ssl_key will enable reverse proxying, point Swifts's entry in the
+      Keystone catalog to use https, and override any certficiate and key
+      issued by Keystone (if it is configured to do so).
+  ssl_key:
+    type: string
+    description: SSL key to use with certificate specified as ssl_cert.      
   # CA Cert info
   use-https:
     default: "no"
