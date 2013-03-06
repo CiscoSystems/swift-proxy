@@ -245,3 +245,19 @@ def configure_haproxy(units, service_ports, template_dir=None):
         f.write(template.render(context))
     with open(HAPROXY_DEFAULT, 'w') as f:
         f.write('ENABLED=1')
+
+def save_script_rc(script_path="scripts/scriptrc", **env_vars):
+    """
+    Write an rc file in the charm-delivered directory containing
+    exported environment variables provided by env_vars. Any charm scripts run
+    outside the juju hook environment can source this scriptrc to obtain
+    updated config information necessary to perform health checks or
+    service changes.
+    """
+    unit_name = os.getenv('JUJU_UNIT_NAME').replace('/', '-')
+    juju_rc_path="/var/lib/juju/units/%s/charm/%s" % (unit_name, script_path)
+    with open(juju_rc_path, 'wb') as rc_script:
+        rc_script.write(
+            "#!/bin/bash\n")
+        [rc_script.write('export %s=%s\n' % (u, p))
+         for u, p in env_vars.iteritems() if u != "script_path"]
