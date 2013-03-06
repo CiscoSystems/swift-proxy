@@ -2,8 +2,8 @@
 
 # Common python helper functions used for OpenStack charms.
 
-import os
 import subprocess
+import os
 
 CLOUD_ARCHIVE_URL = "http://ubuntu-cloud.archive.canonical.com/ubuntu"
 CLOUD_ARCHIVE_KEY_ID = '5EDB1B62EC4926EA'
@@ -224,6 +224,27 @@ def configure_installation_source(rel):
             f.write(src)
     else:
         error_out("Invalid openstack-release specified: %s" % rel)
+
+HAPROXY_CONF = '/etc/haproxy/haproxy.cfg'
+HAPROXY_DEFAULT = '/etc/default/haproxy'
+
+def configure_haproxy(units, service_ports, template_dir=None):
+    template_dir = template_dir or 'templates'
+    import jinja2
+    context = {
+        'units': units,
+        'service_ports': service_ports
+        }
+    templates = jinja2.Environment(
+                    loader=jinja2.FileSystemLoader(template_dir)
+                    )
+    template = templates.get_template(
+                    os.path.basename(HAPROXY_CONF)
+                    )
+    with open(HAPROXY_CONF, 'w') as f:
+        f.write(template.render(context))
+    with open(HAPROXY_DEFAULT, 'w') as f:
+        f.write('ENABLED=1')
 
 def save_script_rc(script_path="scripts/scriptrc", **env_vars):
     """
