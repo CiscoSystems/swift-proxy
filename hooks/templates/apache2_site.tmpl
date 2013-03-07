@@ -1,7 +1,7 @@
 Listen {{ ext }}
 NameVirtualHost *:{{ ext }}
-<VirtualHost *: {{ ext }}>
-    ServerName {{ private-address }}
+<VirtualHost *:{{ ext }}>
+    ServerName {{ private_address }}
     SSLEngine on
     SSLCertificateFile /etc/apache2/ssl/{{ namespace }}/cert
     SSLCertificateKeyFile /etc/apache2/ssl/{{ namespace }}/key

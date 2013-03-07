@@ -348,6 +348,7 @@ def enable_https(port_maps, namespace):
     namespace: str: name of charm
     '''
     juju_log('INFO', "Enabling HTTPS for port mappings: {}".format(port_maps))
+    http_restart = False
     # allow overriding of keystone provided certs with those set manually
     # in config.
     cert = config_get('ssl_cert')
@@ -364,16 +365,17 @@ def enable_https(port_maps, namespace):
                 if not key:
                     key = relation_get('ssl_key', rid=r_id, unit=unit)
                 if not ca_cert:
-                    key = relation_get('ca_cert', rid=r_id, unit=unit)
-        if cert:
-            cert = base64.b64decode(cert)
-        if key:
-            key = base64.b64decode(key)
-        if ca_cert:
-            ca_cert = base64.b64decode(ca_cert)
+                    ca_cert = relation_get('ca_cert', rid=r_id, unit=unit)
     else:
         juju_log('INFO',
                  "Using SSL certificate provided in service config.")
+
+    if cert:
+        cert = base64.b64decode(cert)
+    if key:
+        key = base64.b64decode(key)
+    if ca_cert:
+        ca_cert = base64.b64decode(ca_cert)
 
     if not cert and not key:
         juju_log('ERROR',
@@ -387,7 +389,8 @@ def enable_https(port_maps, namespace):
         http_restart = True
 
     ssl_dir = os.path.join('/etc/apache2/ssl', namespace)
-    os.makedirs(ssl_dir)
+    if not os.path.exists(ssl_dir):
+        os.makedirs(ssl_dir)
     with open(os.path.join(ssl_dir, 'cert'), 'w') as fcert:
         fcert.write(cert)
     with open(os.path.join(ssl_dir, 'key'), 'w') as fkey:
@@ -399,23 +402,22 @@ def enable_https(port_maps, namespace):
         subprocess.check_call(['update-ca-certificates', '--fresh'])
 
     sites_dir = '/etc/apache2/sites-available'
-    for ext_port, int_port in port_maps.iter():
+    for ext_port, int_port in port_maps.items():
         juju_log('INFO',
                  'Creating apache2 reverse proxy vhost'
                  ' for {}:{}'.format(ext_port,
                                      int_port))
-        site = os.path.join(sites_dir,
-                            "{}_{}".format(namespace,
-                                           ext_port))
-        with open(site, 'w') as fsite:
+        site = "{}_{}".format(namespace, ext_port)
+        site_path = os.path.join(sites_dir, site)
+        with open(site_path, 'w') as fsite:
             context = {
                 "ext": ext_port,
                 "int": int_port,
                 "namespace": namespace,
-                "private-address": get_host_ip()
+                "private_address": get_host_ip()
                 }
-            fsite.write(SITE_TEMPLATE,
-                        context)
+            fsite.write(render_template(SITE_TEMPLATE,
+                                        context))
 
         if RELOAD_CHECK in subprocess.check_output(['a2ensite', site]):
             http_restart = True
@@ -482,10 +484,10 @@ def determine_api_port(public_port):
     returns: int: the correct listening port for the API service
     '''
     i = 0
-    if len(peer_units()) > 0 and is_clustered():
+    if len(peer_units()) > 0 or is_clustered():
         i += 1
-        if https():
-            i += 1
+    if https():
+        i += 1
     return public_port - (i * 10)
 
 
