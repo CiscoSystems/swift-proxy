@@ -3,6 +3,7 @@ import pwd
 import subprocess
 import lib.openstack_common as openstack
 import utils
+import sys
 
 # Various config files that are managed via templating.
 SWIFT_HASH_FILE='/var/lib/juju/swift-hash-path.conf'
@@ -332,7 +333,7 @@ def get_zone(assignment_policy):
         return set(potential_zones).pop()
     else:
         utils.juju_log('Invalid zone assignment policy: %s' %\
-                       assignemnt_policy)
+                       assignment_policy)
         sys.exit(1)
 
 
