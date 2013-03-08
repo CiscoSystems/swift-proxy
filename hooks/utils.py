@@ -403,6 +403,7 @@ def enable_https(port_maps, namespace):
         fcert.write(cert)
     with open(os.path.join(ssl_dir, 'key'), 'w') as fkey:
         fkey.write(key)
+    os.chmod(os.path.join(ssl_dir, 'key'), 0600)
     if ca_cert:
         with open('/usr/local/share/ca-certificates/keystone_juju_ca_cert.crt',
                   'w') as crt:
