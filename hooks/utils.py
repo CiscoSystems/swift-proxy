@@ -423,7 +423,7 @@ def enable_https(port_maps, namespace):
             http_restart = True
 
     if http_restart:
-        restart(['apache2'])
+        restart('apache2')
 
     return True
 
