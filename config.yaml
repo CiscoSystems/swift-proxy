@@ -57,9 +57,10 @@ options:
   ssl_key:
     type: string
     description: SSL key to use with certificate specified as ssl_cert.      
-  # CA Cert info
+  # Locally generated CA Cert info (only use without keystone)
+  # These options are deprecated and will be removed sometime
   use-https:
-    default: "no"
+    default: "yes"
     type: string
     description: Whether to listen on HTTPS
   country:
@@ -78,6 +79,7 @@ options:
     default: CN
     type: string
     description: Common Name
+  # General Swift Proxy configuration
   bind-port:
     default: 8080
     type: int

@@ -193,19 +193,6 @@ def write_proxy_config():
     proxy_control('restart')
     subprocess.check_call(['open-port', str(bind_port)])
 
-def configure_ssl():
-    # this should be expanded to cover setting up user-specified certificates
-    if (utils.config_get('use-https') == 'yes' and
-        not os.path.isfile(SSL_CERT) and
-        not os.path.isfile(SSL_KEY)):
-        subj = '/C=%s/ST=%s/L=%s/CN=%s' %\
-               (utils.config_get('country'), utils.config_get('state'),
-                utils.config_get('locale'), utils.config_get('common-name'))
-        cmd = ['openssl', 'req', '-new', '-x509', '-nodes',
-               '-out', SSL_CERT, '-keyout', SSL_KEY,
-               '-subj', subj]
-        subprocess.check_call(cmd)
-
 
 def _load_builder(path):
     # lifted straight from /usr/bin/swift-ring-builder

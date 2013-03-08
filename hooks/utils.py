@@ -13,6 +13,7 @@ import subprocess
 import socket
 import sys
 import base64
+import tempfile
 
 
 def do_hooks(hooks):
@@ -320,6 +321,8 @@ def https():
     .
     returns: boolean
     '''
+    if config_get('use-https'):
+        return True
     if config_get('ssl_cert') and config_get('ssl_key'):
         return True
     for r_id in relation_ids('identity-service'):
@@ -366,6 +369,11 @@ def enable_https(port_maps, namespace):
                     key = relation_get('ssl_key', rid=r_id, unit=unit)
                 if not ca_cert:
                     ca_cert = relation_get('ca_cert', rid=r_id, unit=unit)
+        if (not (cert and key and ca_cert) and
+            config_get('use-https')):
+            juju_log('INFO',
+                     "Using self-signed SSL certificate.")
+            (cert, key) = generate_cert()
     else:
         juju_log('INFO',
                  "Using SSL certificate provided in service config.")
@@ -472,6 +480,32 @@ def setup_https(port_maps, namespace):
         disable_https(port_maps, namespace)
     else:
         enable_https(port_maps, namespace)
+
+
+def generate_cert():
+    '''
+    Generates a self signed certificate and key using the
+    provided charm configuration data.
+
+    returns: tuple of (cert, key)
+    '''
+    CERT = '/etc/swift/ssl.cert'
+    KEY = '/etc/swift/ssl.key'
+    if (not os.path.exists(CERT) and
+        not os.path.exists(KEY)):
+        subj = '/C=%s/ST=%s/L=%s/CN=%s' %\
+            (config_get('country'), config_get('state'),
+             config_get('locale'), config_get('common-name'))
+        cmd = ['openssl', 'req', '-new', '-x509', '-nodes',
+               '-out', CERT, '-keyout', KEY,
+               '-subj', subj]
+        subprocess.check_call(cmd)
+    # Slurp as base64 encoded - makes handling easier up the stack
+    with open(CERT, 'r') as cfile:
+        ssl_cert = base64.b64encode(cfile.read())
+    with open(KEY, 'r') as kfile:
+        ssl_key = base64.b64encode(kfile.read())
+    return (ssl_cert, ssl_key)
 
 
 def determine_api_port(public_port):
