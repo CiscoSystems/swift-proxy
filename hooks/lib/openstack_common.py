@@ -70,7 +70,7 @@ def get_os_codename_install_source(src):
         ca_rel = ca_rel.split('%s-' % ubuntu_rel)[1].split('/')[0]
         return ca_rel
 
-    # Best guess match based on deb string provided
+    # Best guess match based on deb or ppa provided strings
     if src.startswith('deb') or src.startswith('ppa'):
         for k, v in openstack_codenames.iteritems():
             if v in src:
