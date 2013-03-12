@@ -87,21 +87,21 @@ def enable_https(port_maps, namespace):
     if not os.path.exists(ssl_dir):
         os.makedirs(ssl_dir)
 
-    with open(os.path.join(ssl_dir, 'cert'), 'r+') as fcert:
-        current_cert = fcert.read().strip()
-        if current_cert != cert:
-            fcert.truncate(0)
-            fcert.seek(0)
-            fcert.write(cert)
-            http_restart = True
+    def _write_if_changed(path, new_content):
+        content = None
+        if os.path.exists(path):
+            with open(path, 'r') as f:
+                content = f.read().strip()
+        if content != new_content:
+            with open(path, 'w') as f:
+                f.write(new_content)
+            return True
+        else:
+            return False
 
-    with open(os.path.join(ssl_dir, 'key'), 'r+') as fkey:
-        current_key = fkey.read().strip()
-        if current_key != key:
-            fkey.truncate(0)
-            fkey.seek(0)
-            fkey.write(key)
-            http_restart = True
+    if (_write_if_changed(os.path.join(ssl_dir, 'cert'), cert) or
+        _write_if_changed(os.path.join(ssl_dir, 'key'), key)):
+        http_restart = True
     os.chmod(os.path.join(ssl_dir, 'key'), 0600)
 
     if ca_cert:
