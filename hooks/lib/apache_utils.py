@@ -92,16 +92,16 @@ def enable_https(port_maps, namespace):
         if os.path.exists(path):
             with open(path, 'r') as f:
                 content = f.read().strip()
-        if (not content or
-            content != new_content):
+        if content != new_content:
             with open(path, 'w') as f:
                 f.write(new_content)
             return True
         else:
             return False
 
-    if (_write_if_changed(os.path.join(ssl_dir, 'cert'), cert) or
-        _write_if_changed(os.path.join(ssl_dir, 'key'), key)):
+    if (_write_if_changed(os.path.join(ssl_dir, 'cert'), cert)):
+        http_restart = True
+    if (_write_if_changed(os.path.join(ssl_dir, 'key'), key)):
         http_restart = True
     os.chmod(os.path.join(ssl_dir, 'key'), 0600)
 
