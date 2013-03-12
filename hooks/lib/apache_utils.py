@@ -71,7 +71,6 @@ def enable_https(port_maps, namespace):
         key = b64decode(key)
     if ca_cert:
         ca_cert = b64decode(ca_cert)
-    # TODO: Implement check tosee if certs have changed
 
     if not cert and not key:
         juju_log('ERROR',
@@ -87,11 +86,24 @@ def enable_https(port_maps, namespace):
     ssl_dir = os.path.join('/etc/apache2/ssl', namespace)
     if not os.path.exists(ssl_dir):
         os.makedirs(ssl_dir)
-    with open(os.path.join(ssl_dir, 'cert'), 'w') as fcert:
-        fcert.write(cert)
-    with open(os.path.join(ssl_dir, 'key'), 'w') as fkey:
-        fkey.write(key)
+
+    with open(os.path.join(ssl_dir, 'cert'), 'r+') as fcert:
+        current_cert = fcert.read().strip()
+        if current_cert != cert:
+            fcert.truncate(0)
+            fcert.seek(0)
+            fcert.write(cert)
+            http_restart = True
+
+    with open(os.path.join(ssl_dir, 'key'), 'r+') as fkey:
+        current_key = fkey.read().strip()
+        if current_key != key:
+            fkey.truncate(0)
+            fkey.seek(0)
+            fkey.write(key)
+            http_restart = True
     os.chmod(os.path.join(ssl_dir, 'key'), 0600)
+
     if ca_cert:
         with open('/usr/local/share/ca-certificates/keystone_juju_ca_cert.crt',
                   'w') as crt:
