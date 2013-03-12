@@ -1,19 +1,21 @@
 #!/usr/bin/python
 
 import os
-import utils
 import sys
 import shutil
 import uuid
 from subprocess import check_call
 
 import lib.openstack_common as openstack
+import lib.utils as utils
+import lib.cluster_utils as cluster
 import swift_utils as swift
 
 extra_pkgs = [
     "haproxy",
     "python-jinja2"
     ]
+
 
 def install():
     src = utils.config_get('openstack-origin')
@@ -40,7 +42,7 @@ def install():
     swift.write_proxy_config()
 
     # memcached.conf
-    ctxt = { 'proxy_ip': utils.get_host_ip() }
+    ctxt = {'proxy_ip': utils.get_host_ip()}
     with open(swift.MEMCACHED_CONF, 'w') as conf:
         conf.write(swift.render_config(swift.MEMCACHED_CONF, ctxt))
 
@@ -61,14 +63,14 @@ def install():
 
 
 def keystone_joined(relid=None):
-    if not utils.eligible_leader():
+    if not cluster.eligible_leader(swift.SWIFT_HA_RES):
         return
-    if utils.is_clustered():
+    if cluster.is_clustered():
         hostname = utils.config_get('vip')
     else:
         hostname = utils.unit_get('private-address')
     port = utils.config_get('bind-port')
-    if utils.https():
+    if cluster.https():
         proto = 'https'
     else:
         proto = 'http'
@@ -105,7 +107,7 @@ def balance_rings():
         shutil.copyfile(os.path.join(swift.SWIFT_CONF_DIR, f),
                         os.path.join(swift.WWW_DIR, f))
 
-    if utils.eligible_leader():
+    if cluster.eligible_leader(swift.SWIFT_HA_RES):
         msg = 'Broadcasting notification to all storage nodes that new '\
               'ring is ready for consumption.'
         utils.juju_log('INFO', msg)
@@ -118,6 +120,7 @@ def balance_rings():
                                www_dir=www_dir, trigger=trigger)
 
     swift.proxy_control('restart')
+
 
 def storage_changed():
     zone = swift.get_zone(utils.config_get('zone-assignment'))
@@ -149,8 +152,10 @@ def storage_changed():
     if swift.should_balance([r for r in swift.SWIFT_RINGS.itervalues()]):
         balance_rings()
 
+
 def storage_broken():
     swift.write_apache_config()
+
 
 def config_changed():
     relids = utils.relation_ids('identity-service')
@@ -167,7 +172,7 @@ def cluster_changed():
 
 def ha_relation_changed():
     clustered = utils.relation_get('clustered')
-    if clustered and utils.is_leader():
+    if clustered and cluster.is_leader(swift.SWIFT_HA_RES):
         utils.juju_log('INFO',
                        'Cluster configured, notifying other services and'
                        'updating keystone endpoint configuration')

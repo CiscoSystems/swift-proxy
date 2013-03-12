@@ -50,13 +50,19 @@ options:
   ssl_cert:
     type: string
     description: |
-      SSL certificate to install and use for API ports.  Setting this value
-      and ssl_key will enable reverse proxying, point Swifts's entry in the
-      Keystone catalog to use https, and override any certficiate and key
-      issued by Keystone (if it is configured to do so).
+      Base64 encoded SSL certificate to install and use for API ports.
+      .
+         juju set swift-proxy ssl_cert="$(cat cert | base64)" \ 
+                              ssl_key="$(cat key | base64)"
+      .
+      Setting this value (and ssl_key) will enable reverse proxying, point
+      Swifts's entry in the Keystone catalog to use https, and override
+      any certficiate and key issued by Keystone (if it is configured to
+      do so).      
   ssl_key:
     type: string
-    description: SSL key to use with certificate specified as ssl_cert.      
+    description: |
+      Base64 encoded SSL key to use with certificate specified as ssl_cert.
   # Locally generated CA Cert info (only use without keystone)
   # These options are deprecated and will be removed sometime
   use-https:

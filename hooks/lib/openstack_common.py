@@ -12,7 +12,7 @@ ubuntu_openstack_release = {
     'oneiric': 'diablo',
     'precise': 'essex',
     'quantal': 'folsom',
-    'raring' : 'grizzly'
+    'raring': 'grizzly'
 }
 
 
@@ -20,7 +20,8 @@ openstack_codenames = {
     '2011.2': 'diablo',
     '2012.1': 'essex',
     '2012.2': 'folsom',
-    '2013.1': 'grizzly'
+    '2013.1': 'grizzly',
+    '2013.2': 'havana'
 }
 
 # The ugly duckling
@@ -31,6 +32,7 @@ swift_codenames = {
     '1.7.6': 'grizzly',
     '1.7.7': 'grizzly'
 }
+
 
 def juju_log(msg):
     subprocess.check_call(['juju-log', msg])
@@ -76,6 +78,7 @@ def get_os_codename_install_source(src):
             if v in src:
                 return v
 
+
 def get_os_codename_version(vers):
     '''Determine OpenStack codename from version number.'''
     try:
@@ -115,7 +118,7 @@ def get_os_codename_package(pkg):
         return clean
 
     vers = None
-    for l in output.split('\n'):
+    for l in str(output).split('\n'):
         if l.startswith('ii'):
             l = _clean(l)
             if l[1] == pkg:
@@ -153,16 +156,17 @@ def get_os_version_package(pkg):
     e = "Could not determine OpenStack version for package: %s" % pkg
     error_out(e)
 
+
 def configure_installation_source(rel):
     '''Configure apt installation source.'''
 
-    def _import_key(id):
+    def _import_key(keyid):
         cmd = "apt-key adv --keyserver keyserver.ubuntu.com " \
-              "--recv-keys %s" % id
+              "--recv-keys %s" % keyid
         try:
             subprocess.check_call(cmd.split(' '))
-        except:
-            error_out("Error importing repo key %s" % id)
+        except subprocess.CalledProcessError:
+            error_out("Error importing repo key %s" % keyid)
 
     if rel == 'distro':
         return
@@ -171,7 +175,7 @@ def configure_installation_source(rel):
         subprocess.check_call(["add-apt-repository", "-y", src])
     elif rel[:3] == "deb":
         l = len(rel.split('|'))
-        if l ==  2:
+        if l == 2:
             src, key = rel.split('|')
             juju_log("Importing PPA key from keyserver for %s" % src)
             _import_key(key)
@@ -225,26 +229,6 @@ def configure_installation_source(rel):
     else:
         error_out("Invalid openstack-release specified: %s" % rel)
 
-HAPROXY_CONF = '/etc/haproxy/haproxy.cfg'
-HAPROXY_DEFAULT = '/etc/default/haproxy'
-
-def configure_haproxy(units, service_ports, template_dir=None):
-    template_dir = template_dir or 'templates'
-    import jinja2
-    context = {
-        'units': units,
-        'service_ports': service_ports
-        }
-    templates = jinja2.Environment(
-                    loader=jinja2.FileSystemLoader(template_dir)
-                    )
-    template = templates.get_template(
-                    os.path.basename(HAPROXY_CONF)
-                    )
-    with open(HAPROXY_CONF, 'w') as f:
-        f.write(template.render(context))
-    with open(HAPROXY_DEFAULT, 'w') as f:
-        f.write('ENABLED=1')
 
 def save_script_rc(script_path="scripts/scriptrc", **env_vars):
     """
@@ -255,7 +239,7 @@ def save_script_rc(script_path="scripts/scriptrc", **env_vars):
     service changes.
     """
     unit_name = os.getenv('JUJU_UNIT_NAME').replace('/', '-')
-    juju_rc_path="/var/lib/juju/units/%s/charm/%s" % (unit_name, script_path)
+    juju_rc_path = "/var/lib/juju/units/%s/charm/%s" % (unit_name, script_path)
     with open(juju_rc_path, 'wb') as rc_script:
         rc_script.write(
             "#!/bin/bash\n")
