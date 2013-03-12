@@ -7,6 +7,8 @@ import lib.haproxy_utils as haproxy
 import lib.apache_utils as apache
 import lib.cluster_utils as cluster
 import sys
+from base64 import b64encode
+
 
 # Various config files that are managed via templating.
 SWIFT_HASH_FILE = '/var/lib/juju/swift-hash-path.conf'
@@ -390,6 +392,33 @@ def write_apache_config():
     utils.reload('apache2')
 
 
+def generate_cert():
+    '''
+    Generates a self signed certificate and key using the
+    provided charm configuration data.
+
+    returns: tuple of (cert, key)
+    '''
+    CERT = '/etc/swift/swift.cert'
+    KEY = '/etc/swift/swift.key'
+    if (not os.path.exists(CERT) and
+        not os.path.exists(KEY)):
+        subj = '/C=%s/ST=%s/L=%s/CN=%s' %\
+            (utils.config_get('country'), utils.config_get('state'),
+             utils.config_get('locale'), utils.config_get('common-name'))
+        cmd = ['openssl', 'req', '-new', '-x509', '-nodes',
+               '-out', CERT, '-keyout', KEY,
+               '-subj', subj]
+        subprocess.check_call(cmd)
+        os.chmod(KEY, 0600)
+    # Slurp as base64 encoded - makes handling easier up the stack
+    with open(CERT, 'r') as cfile:
+        ssl_cert = b64encode(cfile.read())
+    with open(KEY, 'r') as kfile:
+        ssl_key = b64encode(kfile.read())
+    return (ssl_cert, ssl_key)
+
+
 def configure_haproxy():
     api_port = utils.config_get('bind-port')
     service_ports = {
@@ -412,7 +441,10 @@ def configure_https():
         else:
             target_port = cluster.determine_api_port(api_port)
             write_proxy_config()
+        cert, key = apache.get_cert()
+        if None in (cert, key):
+            cert, key = generate_cert()
+        ca_cert = apache.get_ca_cert()
         apache.setup_https(namespace="swift",
-                           port_maps={api_port: target_port})
-    else:
-        return False
+                           port_maps={api_port: target_port},
+                           cert=cert, key=key, ca_cert=ca_cert)
