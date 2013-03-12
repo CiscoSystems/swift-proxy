@@ -214,7 +214,7 @@ def write_proxy_config():
 
 def _load_builder(path):
     # lifted straight from /usr/bin/swift-ring-builder
-    from swift.common.ring import RingBuilder, Ring
+    from swift.common.ring import RingBuilder
     import cPickle as pickle
     try:
         builder = pickle.load(open(path, 'rb'))
@@ -251,7 +251,6 @@ def initialize_ring(path, part_power, replicas, min_hours):
 
 
 def exists_in_ring(ring_path, node):
-    from swift.common.ring import RingBuilder, Ring
     ring = _load_builder(ring_path).to_dict()
     node['port'] = ring_port(ring_path, node)
 
@@ -268,7 +267,6 @@ def exists_in_ring(ring_path, node):
 
 
 def add_to_ring(ring_path, node):
-    from swift.common.ring import RingBuilder, Ring
     ring = _load_builder(ring_path)
     port = ring_port(ring_path, node)
 
