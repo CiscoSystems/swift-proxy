@@ -92,7 +92,8 @@ def enable_https(port_maps, namespace):
         if os.path.exists(path):
             with open(path, 'r') as f:
                 content = f.read().strip()
-        if content != new_content:
+        if (not content or
+            content != new_content):
             with open(path, 'w') as f:
                 f.write(new_content)
             return True
