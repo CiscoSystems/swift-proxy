@@ -13,19 +13,6 @@ import subprocess
 import socket
 import sys
 
-_cache = {}
-
-
-def cached(func):
-    def wrapper(*args, **kwargs):
-        try:
-            return _cache[str((args, kwargs))]
-        except KeyError:
-            res = func(*args, **kwargs)
-            _cache[str((args, kwargs))] = res
-            return res
-    return wrapper
-
 
 def do_hooks(hooks):
     hook = os.path.basename(sys.argv[0])
@@ -144,7 +131,6 @@ def juju_log(severity, message):
     subprocess.check_call(cmd)
 
 
-@cached
 def relation_ids(relation):
     cmd = [
         'relation-ids',
@@ -157,7 +143,6 @@ def relation_ids(relation):
         return result
 
 
-@cached
 def relation_list(rid):
     cmd = [
         'relation-list',
@@ -170,7 +155,6 @@ def relation_list(rid):
         return result
 
 
-@cached
 def relation_get(attribute, unit=None, rid=None):
     cmd = [
         'relation-get',
@@ -204,7 +188,6 @@ def relation_set(**kwargs):
     subprocess.check_call(cmd)
 
 
-@cached
 def unit_get(attribute):
     cmd = [
         'unit-get',
@@ -217,7 +200,6 @@ def unit_get(attribute):
         return value
 
 
-@cached
 def config_get(attribute):
     cmd = [
         'config-get',
