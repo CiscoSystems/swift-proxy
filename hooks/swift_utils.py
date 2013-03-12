@@ -399,8 +399,8 @@ def generate_cert():
 
     returns: tuple of (cert, key)
     '''
-    CERT = '/etc/swift/swift.cert'
-    KEY = '/etc/swift/swift.key'
+    CERT = '/etc/swift/ssl.cert'
+    KEY = '/etc/swift/ssl.key'
     if (not os.path.exists(CERT) and
         not os.path.exists(KEY)):
         subj = '/C=%s/ST=%s/L=%s/CN=%s' %\
