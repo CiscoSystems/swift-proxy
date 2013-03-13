@@ -2,10 +2,16 @@ import os
 import pwd
 import subprocess
 import lib.openstack_common as openstack
-import utils
+import lib.utils as utils
+import lib.haproxy_utils as haproxy
+import lib.apache_utils as apache
+import lib.cluster_utils as cluster
+import sys
+from base64 import b64encode
+
 
 # Various config files that are managed via templating.
-SWIFT_HASH_FILE='/var/lib/juju/swift-hash-path.conf'
+SWIFT_HASH_FILE = '/var/lib/juju/swift-hash-path.conf'
 SWIFT_CONF = '/etc/swift/swift.conf'
 SWIFT_PROXY_CONF = '/etc/swift/proxy-server.conf'
 SWIFT_CONF_DIR = os.path.dirname(SWIFT_CONF)
@@ -32,8 +38,11 @@ BASE_PACKAGES = [
     'python-keystone',
 ]
 
+SWIFT_HA_RES = 'res_swift_vip'
+
 # Folsom-specific packages
 FOLSOM_PACKAGES = BASE_PACKAGES + ['swift-plugin-s3']
+
 
 def proxy_control(action):
     '''utility to work around swift-init's bad RCs.'''
@@ -49,8 +58,9 @@ def proxy_control(action):
         elif status == 0:
             return subprocess.check_call(_cmd('stop'))
 
-    # the proxy will not start unless there are balanced rings, gzip'd in /etc/swift
-    missing=False
+    # the proxy will not start unless there are balanced rings
+    # gzip'd in /etc/swift
+    missing = False
     for k in SWIFT_RINGS.keys():
         if not os.path.exists(os.path.join(SWIFT_CONF_DIR, '%s.ring.gz' % k)):
             missing = True
@@ -69,8 +79,9 @@ def proxy_control(action):
         elif status == 1:
             return subprocess.check_call(_cmd('start'))
 
+
 def swift_user(username='swift'):
-    user = pwd.getpwnam('swift')
+    user = pwd.getpwnam(username)
     return (user.pw_uid, user.pw_gid)
 
 
@@ -105,6 +116,10 @@ def get_swift_hash():
     if os.path.isfile(SWIFT_HASH_FILE):
         with open(SWIFT_HASH_FILE, 'r') as hashfile:
             swift_hash = hashfile.read().strip()
+    elif utils.config_get('swift-hash'):
+        swift_hash = utils.config_get('swift-hash')
+        with open(SWIFT_HASH_FILE, 'w') as hashfile:
+            hashfile.write(swift_hash)
     else:
         cmd = ['od', '-t', 'x8', '-N', '8', '-A', 'n']
         rand = open('/dev/random', 'r')
@@ -148,11 +163,16 @@ def get_keystone_auth():
                 'keystone_host': utils.relation_get('auth_host',
                                                     unit, relid),
                 'auth_port': utils.relation_get('auth_port', unit, relid),
-                'service_user': utils.relation_get('service_username', unit, relid),
-                'service_password': utils.relation_get('service_password', unit, relid),
-                'service_tenant': utils.relation_get('service_tenant', unit, relid),
-                'service_port': utils.relation_get('service_port', unit, relid),
-                'admin_token': utils.relation_get('admin_token', unit, relid),
+                'service_user': utils.relation_get('service_username',
+                                                   unit, relid),
+                'service_password': utils.relation_get('service_password',
+                                                       unit, relid),
+                'service_tenant': utils.relation_get('service_tenant',
+                                                     unit, relid),
+                'service_port': utils.relation_get('service_port',
+                                                   unit, relid),
+                'admin_token': utils.relation_get('admin_token',
+                                                  unit, relid),
             }
             if None not in ks_auth.itervalues():
                 return ks_auth
@@ -174,17 +194,12 @@ def write_proxy_config():
 
     ctxt = {
         'proxy_ip': utils.get_host_ip(),
-        'bind_port': bind_port,
+        'bind_port': cluster.determine_api_port(bind_port),
         'workers': workers,
         'operator_roles': utils.config_get('operator-roles')
     }
 
-    if utils.config_get('use-https') == 'no':
-        ctxt['ssl'] = False
-    else:
-        ctxt['ssl'] = True
-        ctxt['ssl_cert'] = SSL_CERT
-        ctxt['ssl_key'] = SSL_KEY
+    ctxt['ssl'] = False
 
     ks_auth = get_keystone_auth()
     if ks_auth:
@@ -198,23 +213,10 @@ def write_proxy_config():
     proxy_control('restart')
     subprocess.check_call(['open-port', str(bind_port)])
 
-def configure_ssl():
-    # this should be expanded to cover setting up user-specified certificates
-    if (utils.config_get('use-https') == 'yes' and
-        not os.path.isfile(SSL_CERT) and
-        not os.path.isfile(SSL_KEY)):
-        subj = '/C=%s/ST=%s/L=%s/CN=%s' %\
-               (utils.config_get('country'), utils.config_get('state'),
-                utils.config_get('locale'), utils.config_get('common-name'))
-        cmd = ['openssl', 'req', '-new', '-x509', '-nodes',
-               '-out', SSL_CERT, '-keyout', SSL_KEY,
-               '-subj', subj]
-        subprocess.check_call(cmd)
-
 
 def _load_builder(path):
     # lifted straight from /usr/bin/swift-ring-builder
-    from swift.common.ring import RingBuilder, Ring
+    from swift.common.ring import RingBuilder
     import cPickle as pickle
     try:
         builder = pickle.load(open(path, 'rb'))
@@ -223,10 +225,8 @@ def _load_builder(path):
             builder = RingBuilder(1, 1, 1)
             builder.copy_from(builder_dict)
     except ImportError:  # Happens with really old builder pickles
-        modules['swift.ring_builder'] = \
-            modules['swift.common.ring.builder']
         builder = RingBuilder(1, 1, 1)
-        builder.copy_from(pickle.load(open(argv[1], 'rb')))
+        builder.copy_from(pickle.load(open(path, 'rb')))
     for dev in builder.devs:
         if dev and 'meta' not in dev:
             dev['meta'] = ''
@@ -236,8 +236,6 @@ def _load_builder(path):
 def _write_ring(ring, ring_path):
     import cPickle as pickle
     pickle.dump(ring.to_dict(), open(ring_path, 'wb'), protocol=2)
-
-
 
 
 def ring_port(ring_path, node):
@@ -253,8 +251,8 @@ def initialize_ring(path, part_power, replicas, min_hours):
     ring = RingBuilder(part_power, replicas, min_hours)
     _write_ring(ring, path)
 
+
 def exists_in_ring(ring_path, node):
-    from swift.common.ring import RingBuilder, Ring
     ring = _load_builder(ring_path).to_dict()
     node['port'] = ring_port(ring_path, node)
 
@@ -271,7 +269,6 @@ def exists_in_ring(ring_path, node):
 
 
 def add_to_ring(ring_path, node):
-    from swift.common.ring import RingBuilder, Ring
     ring = _load_builder(ring_path)
     port = ring_port(ring_path, node)
 
@@ -291,8 +288,9 @@ def add_to_ring(ring_path, node):
     }
     ring.add_dev(new_dev)
     _write_ring(ring, ring_path)
-    msg = 'Added new device to ring %s: %s' % (ring_path,
-                                               [k for k in new_dev.iteritems()])
+    msg = 'Added new device to ring %s: %s' %\
+         (ring_path,
+          [k for k in new_dev.iteritems()])
     utils.juju_log('INFO', msg)
 
 
@@ -337,8 +335,8 @@ def get_zone(assignment_policy):
             potential_zones.append(_get_zone(builder))
         return set(potential_zones).pop()
     else:
-        utils.juju_log('Invalid zone assignment policy: %s' %\
-                       assignemnt_policy)
+        utils.juju_log('ERROR', 'Invalid zone assignment policy: %s' %\
+                       assignment_policy)
         sys.exit(1)
 
 
@@ -356,8 +354,9 @@ def balance_ring(ring_path):
         # swift-ring-builder returns 1 on WARNING (ring didn't require balance)
         return False
     else:
-        utils.juju_log('balance_ring: %s returned %s' % (cmd, rc))
+        utils.juju_log('ERROR', 'balance_ring: %s returned %s' % (cmd, rc))
         sys.exit(1)
+
 
 def should_balance(rings):
     '''Based on zones vs min. replicas, determine whether or not the rings
@@ -384,8 +383,68 @@ def write_apache_config():
             host = utils.relation_get('private-address', unit, relid)
             allowed_hosts.append(utils.get_host_ip(host))
 
-    ctxt = { 'www_dir': WWW_DIR, 'allowed_hosts': allowed_hosts }
+    ctxt = {
+        'www_dir': WWW_DIR,
+        'allowed_hosts': allowed_hosts
+        }
     with open(APACHE_CONF, 'w') as conf:
         conf.write(render_config(APACHE_CONF, ctxt))
-    subprocess.check_call(['service', 'apache2', 'reload'])
+    utils.reload('apache2')
 
+
+def generate_cert():
+    '''
+    Generates a self signed certificate and key using the
+    provided charm configuration data.
+
+    returns: tuple of (cert, key)
+    '''
+    CERT = '/etc/swift/ssl.cert'
+    KEY = '/etc/swift/ssl.key'
+    if (not os.path.exists(CERT) and
+        not os.path.exists(KEY)):
+        subj = '/C=%s/ST=%s/L=%s/CN=%s' %\
+            (utils.config_get('country'), utils.config_get('state'),
+             utils.config_get('locale'), utils.config_get('common-name'))
+        cmd = ['openssl', 'req', '-new', '-x509', '-nodes',
+               '-out', CERT, '-keyout', KEY,
+               '-subj', subj]
+        subprocess.check_call(cmd)
+        os.chmod(KEY, 0600)
+    # Slurp as base64 encoded - makes handling easier up the stack
+    with open(CERT, 'r') as cfile:
+        ssl_cert = b64encode(cfile.read())
+    with open(KEY, 'r') as kfile:
+        ssl_key = b64encode(kfile.read())
+    return (ssl_cert, ssl_key)
+
+
+def configure_haproxy():
+    api_port = utils.config_get('bind-port')
+    service_ports = {
+        "swift": [
+            cluster.determine_haproxy_port(api_port),
+            cluster.determine_api_port(api_port)
+            ]
+        }
+    write_proxy_config()
+    haproxy.configure_haproxy(service_ports)
+
+
+def configure_https():
+    if cluster.https():
+        api_port = utils.config_get('bind-port')
+        if (len(cluster.peer_units()) > 0 or
+            cluster.is_clustered()):
+            target_port = cluster.determine_haproxy_port(api_port)
+            configure_haproxy()
+        else:
+            target_port = cluster.determine_api_port(api_port)
+            write_proxy_config()
+        cert, key = apache.get_cert()
+        if None in (cert, key):
+            cert, key = generate_cert()
+        ca_cert = apache.get_ca_cert()
+        apache.setup_https(namespace="swift",
+                           port_maps={api_port: target_port},
+                           cert=cert, key=key, ca_cert=ca_cert)

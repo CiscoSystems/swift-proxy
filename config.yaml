@@ -46,7 +46,25 @@ options:
       zones before the storage ring will be initially balance.  Deployment
       requirements differ based on the zone-assignment policy configured, see
       this charm's README for details.
-  # CA Cert info
+  # User provided SSL cert and key
+  ssl_cert:
+    type: string
+    description: |
+      Base64 encoded SSL certificate to install and use for API ports.
+      .
+         juju set swift-proxy ssl_cert="$(cat cert | base64)" \
+                              ssl_key="$(cat key | base64)"
+      .
+      Setting this value (and ssl_key) will enable reverse proxying, point
+      Swifts's entry in the Keystone catalog to use https, and override
+      any certficiate and key issued by Keystone (if it is configured to
+      do so).
+  ssl_key:
+    type: string
+    description: |
+      Base64 encoded SSL key to use with certificate specified as ssl_cert.
+  # Locally generated CA Cert info (only use without keystone)
+  # These options are deprecated and will be removed sometime
   use-https:
     default: "yes"
     type: string
@@ -67,6 +85,7 @@ options:
     default: CN
     type: string
     description: Common Name
+  # General Swift Proxy configuration
   bind-port:
     default: 8080
     type: int
@@ -105,3 +124,30 @@ options:
   keystone-admin-password:
     type: string
     description: Keystone admin password
+  # HA configuration settings
+  swift-hash:
+    type: string
+    description: Hash to use across all swift-proxy servers - don't loose
+  vip:
+    type: string
+    description: "Virtual IP to use to front swift-proxy in ha configuration"
+  vip_iface:
+    type: string
+    default: eth0
+    description: "Network Interface where to place the Virtual IP"
+  vip_cidr:
+    type: int
+    default: 24
+    description: "Netmask that will be used for the Virtual IP"
+  ha-bindiface:
+    type: string
+    default: eth0
+    description: |
+      Default network interface on which HA cluster will bind to communication
+      with the other members of the HA Cluster.
+  ha-mcastport:
+    type: int
+    default: 5414
+    description: |
+      Default multicast port number that will be used to communicate between
+      HA Cluster nodes.

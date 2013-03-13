@@ -18,10 +18,12 @@ def do_hooks(hooks):
     hook = os.path.basename(sys.argv[0])
 
     try:
-        hooks[hook]()
+        hook_func = hooks[hook]
     except KeyError:
         juju_log('INFO',
                  "This charm doesn't know how to handle '{}'.".format(hook))
+    else:
+        hook_func()
 
 
 def install(*pkgs):
@@ -34,7 +36,7 @@ def install(*pkgs):
         cmd.append(pkg)
     subprocess.check_call(cmd)
 
-TEMPLATES_DIR = 'hooks/templates'
+TEMPLATES_DIR = 'templates'
 
 try:
     import jinja2
@@ -44,11 +46,9 @@ except ImportError:
 
 try:
     import dns.resolver
-    import dns.ipv4
 except ImportError:
     install('python-dnspython')
     import dns.resolver
-    import dns.ipv4
 
 
 def render_template(template_name, context, template_dir=TEMPLATES_DIR):
@@ -66,7 +66,10 @@ deb http://ubuntu-cloud.archive.canonical.com/ubuntu {} main
 CLOUD_ARCHIVE_POCKETS = {
     'folsom': 'precise-updates/folsom',
     'folsom/updates': 'precise-updates/folsom',
-    'folsom/proposed': 'precise-proposed/folsom'
+    'folsom/proposed': 'precise-proposed/folsom',
+    'grizzly': 'precise-updates/grizzly',
+    'grizzly/updates': 'precise-updates/grizzly',
+    'grizzly/proposed': 'precise-proposed/grizzly'
     }
 
 
@@ -133,7 +136,11 @@ def relation_ids(relation):
         'relation-ids',
         relation
         ]
-    return subprocess.check_output(cmd).split()  # IGNORE:E1103
+    result = str(subprocess.check_output(cmd)).split()
+    if result == "":
+        return None
+    else:
+        return result
 
 
 def relation_list(rid):
@@ -141,7 +148,11 @@ def relation_list(rid):
         'relation-list',
         '-r', rid,
         ]
-    return subprocess.check_output(cmd).split()  # IGNORE:E1103
+    result = str(subprocess.check_output(cmd)).split()
+    if result == "":
+        return None
+    else:
+        return result
 
 
 def relation_get(attribute, unit=None, rid=None):
@@ -203,35 +214,47 @@ def config_get(attribute):
     except KeyError:
         return None
 
+
 def get_unit_hostname():
     return socket.gethostname()
 
 
 def get_host_ip(hostname=unit_get('private-address')):
     try:
-      # Test to see if already an IPv4 address
-      socket.inet_aton(hostname)
-      return hostname
+        # Test to see if already an IPv4 address
+        socket.inet_aton(hostname)
+        return hostname
     except socket.error:
-      try:
         answers = dns.resolver.query(hostname, 'A')
         if answers:
-          return answers[0].address
-      except dns.resolver.NXDOMAIN:
-        pass
-      return None
+            return answers[0].address
+    return None
+
+
+def _svc_control(service, action):
+    subprocess.check_call(['service', service, action])
 
 
 def restart(*services):
     for service in services:
-        subprocess.check_call(['service', service, 'restart'])
+        _svc_control(service, 'restart')
 
 
 def stop(*services):
     for service in services:
-        subprocess.check_call(['service', service, 'stop'])
+        _svc_control(service, 'stop')
 
 
 def start(*services):
     for service in services:
-        subprocess.check_call(['service', service, 'start'])
+        _svc_control(service, 'start')
+
+
+def reload(*services):
+    for service in services:
+        try:
+            _svc_control(service, 'reload')
+        except subprocess.CalledProcessError:
+            # Reload failed - either service does not support reload
+            # or it was not running - restart will fixup most things
+            _svc_control(service, 'restart')
