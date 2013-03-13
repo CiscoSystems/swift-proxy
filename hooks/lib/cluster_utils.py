@@ -81,7 +81,7 @@ def https():
     .
     returns: boolean
     '''
-    if config_get('use-https'):
+    if config_get('use-https') == "yes":
         return True
     if config_get('ssl_cert') and config_get('ssl_key'):
         return True
