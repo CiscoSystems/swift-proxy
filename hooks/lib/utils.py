@@ -86,8 +86,11 @@ def configure_source():
             ]
         subprocess.check_call(cmd)
     if source.startswith('cloud:'):
+        # CA values should be formatted as cloud:ubuntu-openstack/pocket, eg:
+        #   cloud:precise-folsom/updates or cloud:precise-folsom/proposed
         install('ubuntu-cloud-keyring')
         pocket = source.split(':')[1]
+        pocket = pocket.split('-')[1]
         with open('/etc/apt/sources.list.d/cloud-archive.list', 'w') as apt:
             apt.write(CLOUD_ARCHIVE.format(CLOUD_ARCHIVE_POCKETS[pocket]))
     if source.startswith('deb'):
