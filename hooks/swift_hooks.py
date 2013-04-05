@@ -111,13 +111,20 @@ def balance_rings():
         msg = 'Broadcasting notification to all storage nodes that new '\
               'ring is ready for consumption.'
         utils.juju_log('INFO', msg)
-        www_dir = swift.WWW_DIR.split('/var/www/')[1]
+        path = swift.WWW_DIR.split('/var/www/')[1]
         trigger = uuid.uuid4()
         swift_hash = swift.get_swift_hash()
+
+        if cluster.is_clustered():
+            hostname = utils.config_get('vip')
+        else:
+            hostname = utils.unit_get('private-address')
+
+        rings_url = 'http://%s/%s' % (hostname, path)
         # notify storage nodes that there is a new ring to fetch.
         for relid in utils.relation_ids('swift-storage'):
             utils.relation_set(rid=relid, swift_hash=swift_hash,
-                               www_dir=www_dir, trigger=trigger)
+                               rings_url=rings_url, trigger=trigger)
 
     swift.proxy_control('restart')
 
