@@ -37,6 +37,7 @@ def install():
     ctxt = { 'proxy_ip': utils.get_host_ip() }
     with open(swift.MEMCACHED_CONF, 'w') as conf:
         conf.write(swift.render_config(swift.MEMCACHED_CONF, ctxt))
+    check_call(['service', 'memcached', 'restart'])
 
     # generate or setup SSL certificate
     swift.configure_ssl()
