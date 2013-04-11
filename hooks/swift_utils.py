@@ -196,7 +196,8 @@ def write_proxy_config():
         'proxy_ip': utils.get_host_ip(),
         'bind_port': cluster.determine_api_port(bind_port),
         'workers': workers,
-        'operator_roles': utils.config_get('operator-roles')
+        'operator_roles': utils.config_get('operator-roles'),
+        'delay_auth_decision': utils.config_get('delay-auth-decision')
     }
 
     ctxt['ssl'] = False
