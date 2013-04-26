@@ -103,8 +103,8 @@ options:
     type: string
     description: Auth method to use, tempauth or keystone
   delay-auth-decision:
-    default: "True"
-    type: string
+    default: true
+    type: boolean
     description: Delay authentication to downstream WSGI services.
   # Manual Keystone configuration.
   keystone-auth-host:
