@@ -458,4 +458,3 @@ def do_openstack_upgrade(source, packages):
     cmd = ['apt-get', '--option', 'Dpkg::Options::=--force-confnew', '-y',
            'install'] + packages
     subprocess.check_call(cmd)
-    proxy_control('restart')
