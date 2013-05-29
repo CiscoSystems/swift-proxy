@@ -166,6 +166,17 @@ def storage_broken():
 
 
 def config_changed():
+    # Determine whether or not we should do an upgrade, based on the
+    # the version offered in keyston-release.
+    src = utils.config_get('openstack-origin')
+    available = openstack.get_os_codename_install_source(src)
+    installed = openstack.get_os_codename_package('python-swift')
+    if (available and
+        openstack.get_os_version_codename(available) > \
+        openstack.get_os_version_codename(installed)):
+        pkgs = swift.determine_packages(available)
+        swift.do_openstack_upgrade(src, pkgs)
+
     relids = utils.relation_ids('identity-service')
     if relids:
         for relid in relids:

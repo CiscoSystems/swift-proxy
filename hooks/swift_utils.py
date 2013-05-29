@@ -449,3 +449,12 @@ def configure_https():
         apache.setup_https(namespace="swift",
                            port_maps={api_port: target_port},
                            cert=cert, key=key, ca_cert=ca_cert)
+
+
+def do_openstack_upgrade(source, packages):
+    openstack.configure_installation_source(source)
+    os.environ['DEBIAN_FRONTEND'] = 'noninteractive'
+    subprocess.check_call(['apt-get', 'update'])
+    cmd = ['apt-get', '--option', 'Dpkg::Options::=--force-confnew', '-y',
+           'install'] + packages
+    subprocess.check_call(cmd)
