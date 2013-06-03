@@ -2,7 +2,9 @@
 
 # Common python helper functions used for OpenStack charms.
 
+import apt_pkg as apt
 import subprocess
+import os
 
 CLOUD_ARCHIVE_URL = "http://ubuntu-cloud.archive.canonical.com/ubuntu"
 CLOUD_ARCHIVE_KEY_ID = '5EDB1B62EC4926EA'
@@ -11,7 +13,7 @@ ubuntu_openstack_release = {
     'oneiric': 'diablo',
     'precise': 'essex',
     'quantal': 'folsom',
-    'raring' : 'grizzly'
+    'raring': 'grizzly',
 }
 
 
@@ -19,7 +21,8 @@ openstack_codenames = {
     '2011.2': 'diablo',
     '2012.1': 'essex',
     '2012.2': 'folsom',
-    '2013.1': 'grizzly'
+    '2013.1': 'grizzly',
+    '2013.2': 'havana',
 }
 
 # The ugly duckling
@@ -27,8 +30,11 @@ swift_codenames = {
     '1.4.3': 'diablo',
     '1.4.8': 'essex',
     '1.7.4': 'folsom',
-    '1.8.0': 'grizzly'
+    '1.7.6': 'grizzly',
+    '1.7.7': 'grizzly',
+    '1.8.0': 'grizzly',
 }
+
 
 def juju_log(msg):
     subprocess.check_call(['juju-log', msg])
@@ -68,11 +74,12 @@ def get_os_codename_install_source(src):
         ca_rel = ca_rel.split('%s-' % ubuntu_rel)[1].split('/')[0]
         return ca_rel
 
-    # Best guess match based on deb or ppa provided strings
+    # Best guess match based on deb string provided
     if src.startswith('deb') or src.startswith('ppa'):
         for k, v in openstack_codenames.iteritems():
             if v in src:
                 return v
+
 
 def get_os_codename_version(vers):
     '''Determine OpenStack codename from version number.'''
@@ -95,37 +102,18 @@ def get_os_version_codename(codename):
 
 def get_os_codename_package(pkg):
     '''Derive OpenStack release codename from an installed package.'''
-    cmd = ['dpkg', '-l', pkg]
-
+    apt.init()
+    cache = apt.Cache()
     try:
-        output = subprocess.check_output(cmd)
-    except subprocess.CalledProcessError:
-        e = 'Could not derive OpenStack version from package that is not '\
-            'installed; %s' % pkg
-        error_out(e)
-
-    def _clean(line):
-        line = line.split(' ')
-        clean = []
-        for c in line:
-            if c != '':
-                clean.append(c)
-        return clean
-
-    vers = None
-    for l in output.split('\n'):
-        if l.startswith('ii'):
-            l = _clean(l)
-            if l[1] == pkg:
-                vers = l[2]
-
-    if not vers:
+        pkg = cache[pkg]
+    except:
         e = 'Could not determine version of installed package: %s' % pkg
         error_out(e)
 
-    vers = vers[:6]
+    vers = apt.UpstreamVersion(pkg.current_ver.ver_str)
+
     try:
-        if 'swift' in pkg:
+        if 'swift' in pkg.name:
             vers = vers[:5]
             return swift_codenames[vers]
         else:
@@ -151,16 +139,17 @@ def get_os_version_package(pkg):
     e = "Could not determine OpenStack version for package: %s" % pkg
     error_out(e)
 
+
 def configure_installation_source(rel):
     '''Configure apt installation source.'''
 
-    def _import_key(id):
+    def _import_key(keyid):
         cmd = "apt-key adv --keyserver keyserver.ubuntu.com " \
-              "--recv-keys %s" % id
+              "--recv-keys %s" % keyid
         try:
             subprocess.check_call(cmd.split(' '))
-        except:
-            error_out("Error importing repo key %s" % id)
+        except subprocess.CalledProcessError:
+            error_out("Error importing repo key %s" % keyid)
 
     if rel == 'distro':
         return
@@ -169,7 +158,7 @@ def configure_installation_source(rel):
         subprocess.check_call(["add-apt-repository", "-y", src])
     elif rel[:3] == "deb":
         l = len(rel.split('|'))
-        if l ==  2:
+        if l == 2:
             src, key = rel.split('|')
             juju_log("Importing PPA key from keyserver for %s" % src)
             _import_key(key)
@@ -222,3 +211,20 @@ def configure_installation_source(rel):
             f.write(src)
     else:
         error_out("Invalid openstack-release specified: %s" % rel)
+
+
+def save_script_rc(script_path="scripts/scriptrc", **env_vars):
+    """
+    Write an rc file in the charm-delivered directory containing
+    exported environment variables provided by env_vars. Any charm scripts run
+    outside the juju hook environment can source this scriptrc to obtain
+    updated config information necessary to perform health checks or
+    service changes.
+    """
+    charm_dir = os.getenv('CHARM_DIR')
+    juju_rc_path = "%s/%s" % (charm_dir, script_path)
+    with open(juju_rc_path, 'wb') as rc_script:
+        rc_script.write(
+            "#!/bin/bash\n")
+        [rc_script.write('export %s=%s\n' % (u, p))
+         for u, p in env_vars.iteritems() if u != "script_path"]
