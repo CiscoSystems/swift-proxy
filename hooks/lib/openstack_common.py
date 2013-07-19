@@ -205,7 +205,8 @@ def configure_installation_source(rel):
             error_out(e)
 
         src = "deb %s %s main" % (CLOUD_ARCHIVE_URL, pocket)
-        _import_key(CLOUD_ARCHIVE_KEY_ID)
+        cmd = ['apt-get', '-y', 'install', 'ubuntu-cloud-keyring']
+        subprocess.check_call(cmd)
 
         with open('/etc/apt/sources.list.d/cloud-archive.list', 'w') as f:
             f.write(src)
