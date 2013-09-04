@@ -14,6 +14,7 @@ ubuntu_openstack_release = {
     'precise': 'essex',
     'quantal': 'folsom',
     'raring': 'grizzly',
+    'saucy': 'havana',
 }
 
 
@@ -33,6 +34,7 @@ swift_codenames = {
     '1.7.6': 'grizzly',
     '1.7.7': 'grizzly',
     '1.8.0': 'grizzly',
+    '1.9.1': 'havana',
 }
 
 
