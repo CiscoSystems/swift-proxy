@@ -17,6 +17,7 @@ SWIFT_PROXY_CONF = '/etc/swift/proxy-server.conf'
 SWIFT_CONF_DIR = os.path.dirname(SWIFT_CONF)
 MEMCACHED_CONF = '/etc/memcached.conf'
 APACHE_CONF = '/etc/apache2/conf.d/swift-rings'
+APACHE_24_CONF = '/etc/apache2/conf-available/swift-rings.conf'
 
 WWW_DIR = '/var/www/swift-rings'
 
@@ -378,7 +379,11 @@ def should_balance(rings):
 def write_apache_config():
     '''write out /etc/apache2/conf.d/swift-rings with a list of authenticated
        hosts'''
-    utils.juju_log('INFO', 'Updating %s.' % APACHE_CONF)
+    apache_conf = APACHE_CONF
+    apache24 = os.path.exists(os.path.dirname(APACHE_24_CONF))
+    if apache24:
+        apache_conf = APACHE_24_CONF
+    utils.juju_log('INFO', 'Updating %s.' % apache_conf)
 
     allowed_hosts = []
     for relid in utils.relation_ids('swift-storage'):
@@ -390,8 +395,10 @@ def write_apache_config():
         'www_dir': WWW_DIR,
         'allowed_hosts': allowed_hosts
         }
-    with open(APACHE_CONF, 'w') as conf:
+    with open(apache_conf, 'w') as conf:
         conf.write(render_config(APACHE_CONF, ctxt))
+    if apache24:
+        subprocess.check_call(['a2enconf', 'swift-rings'])
     utils.reload('apache2')
 
 
