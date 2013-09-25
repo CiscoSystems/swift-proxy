@@ -27,6 +27,17 @@ SITE_TEMPLATE = "apache2_site.tmpl"
 RELOAD_CHECK = "To activate the new configuration"
 
 
+def is_apache24():
+    try:
+        version = subprocess.check_output(['a2query', '-v'])
+        if version.startswith('2.4'):
+            return True
+        else:
+            return False
+    except subprocess.CalledProcessError:
+        return False
+
+
 def get_cert():
     cert = config_get('ssl_cert')
     key = config_get('ssl_key')
@@ -127,6 +138,8 @@ def enable_https(port_maps, namespace, cert, key, ca_cert=None):
                  ' for {}:{}'.format(ext_port,
                                      int_port))
         site = "{}_{}".format(namespace, ext_port)
+        if is_apache24():
+            site = "{}.conf".format(site)
         site_path = os.path.join(sites_dir, site)
         with open(site_path, 'w') as fsite:
             context = {
@@ -162,9 +175,12 @@ def disable_https(port_maps, namespace):
 
     http_restart = False
     for ext_port in port_maps.keys():
-        if os.path.exists(os.path.join(APACHE_SITE_DIR,
-                                       "{}_{}".format(namespace,
-                                                      ext_port))):
+        site_path = os.path.join(APACHE_SITE_DIR,
+                                 "{}_{}".format(namespace,
+                                                ext_port))
+        if is_apache24():
+            site_path = "{}.conf".format(site_path)
+        if os.path.exists(site_path):
             juju_log('INFO',
                      "Disabling HTTPS reverse proxy"
                      " for {} {}.".format(namespace,
