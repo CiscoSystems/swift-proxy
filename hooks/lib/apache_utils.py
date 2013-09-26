@@ -30,11 +30,9 @@ RELOAD_CHECK = "To activate the new configuration"
 def is_apache24():
     try:
         version = subprocess.check_output(['a2query', '-v'])
-        if version.startswith('2.4'):
-            return True
-        else:
-            return False
-    except subprocess.CalledProcessError:
+        return version.startswith('2.4')
+    except (subprocess.CalledProcessError, OSError):
+        # Catch OSError just in case apache2 not yet installed
         return False
 
 
