@@ -23,7 +23,8 @@ from swift_utils import (
     exists_in_ring,
     add_to_ring,
     should_balance,
-    do_openstack_upgrade
+    do_openstack_upgrade,
+    write_rc_script
 )
 from swift_context import get_swift_hash
 
@@ -277,8 +278,14 @@ def configure_https():
         cmd = ['a2dissite', 'openstack_https_frontend']
         subprocess.check_call(cmd)
 
+    # Apache 2.4 required enablement of configuration
+    if os.path.exists('/usr/sbin/a2enconf'):
+        subprocess.check_call(['a2enconf', 'swift-rings'])
+
     for rid in relation_ids('identity-service'):
         keystone_joined(relid=rid)
+
+    write_rc_script()
 
 
 def main():

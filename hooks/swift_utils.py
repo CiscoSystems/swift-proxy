@@ -175,7 +175,7 @@ def determine_packages(release):
         return FOLSOM_PACKAGES
 
 
-def write_proxy_config():
+def write_rc_script():
     env_vars = {'OPENSTACK_SERVICE_SWIFT': 'proxy-server',
                 'OPENSTACK_PORT_API': config('bind-port'),
                 'OPENSTACK_PORT_MEMCACHED': 11211}
@@ -338,14 +338,6 @@ def should_balance(rings):
         if len(set(zones)) < replicas:
             do_rebalance = False
     return do_rebalance
-
-
-def write_apache_config():
-    '''write out /etc/apache2/conf.d/swift-rings with a list of authenticated
-       hosts'''
-    apache24 = os.path.exists(os.path.dirname(MEMCACHED_CONF))
-    if apache24:
-        subprocess.check_call(['a2enconf', 'swift-rings'])
 
 
 def do_openstack_upgrade(source, packages):
