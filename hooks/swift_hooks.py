@@ -46,6 +46,7 @@ from charmhelpers.fetch import (
     apt_install,
     apt_update
 )
+from charmhelpers.payload.execd import execd_preinstall
 
 extra_pkgs = [
     "haproxy",
@@ -60,6 +61,7 @@ CONFIGS = register_configs()
 
 @hooks.hook('install')
 def install():
+    execd_preinstall()
     src = config('openstack-origin')
     if src != 'distro':
         openstack.configure_installation_source(src)

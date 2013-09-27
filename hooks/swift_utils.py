@@ -3,7 +3,6 @@ import pwd
 import subprocess
 import charmhelpers.contrib.openstack.utils as openstack
 import sys
-from base64 import b64encode
 from collections import OrderedDict
 
 from charmhelpers.core.hookenv import (
