@@ -1,22 +1,36 @@
 import os
 import pwd
 import subprocess
-import lib.openstack_common as openstack
-import lib.utils as utils
-import lib.haproxy_utils as haproxy
-import lib.apache_utils as apache
-import lib.cluster_utils as cluster
+import charmhelpers.contrib.openstack.utils as openstack
 import sys
-from base64 import b64encode
+from collections import OrderedDict
+
+from charmhelpers.core.hookenv import (
+    log, ERROR,
+    config,
+    relation_get,
+)
+from charmhelpers.fetch import (
+    apt_update,
+    apt_install
+)
+
+import charmhelpers.contrib.openstack.context as context
+import charmhelpers.contrib.openstack.templating as templating
+import swift_context
 
 
 # Various config files that are managed via templating.
-SWIFT_HASH_FILE = '/var/lib/juju/swift-hash-path.conf'
 SWIFT_CONF = '/etc/swift/swift.conf'
 SWIFT_PROXY_CONF = '/etc/swift/proxy-server.conf'
 SWIFT_CONF_DIR = os.path.dirname(SWIFT_CONF)
 MEMCACHED_CONF = '/etc/memcached.conf'
-APACHE_CONF = '/etc/apache2/conf.d/swift-rings'
+SWIFT_RINGS_CONF = '/etc/apache2/conf.d/swift-rings'
+SWIFT_RINGS_24_CONF = '/etc/apache2/conf-available/swift-rings.conf'
+HAPROXY_CONF = '/etc/haproxy/haproxy.cfg'
+APACHE_SITE_CONF = '/etc/apache2/sites-available/openstack_https_frontend'
+APACHE_SITE_24_CONF = '/etc/apache2/sites-available/' \
+    'openstack_https_frontend.conf'
 
 WWW_DIR = '/var/www/swift-rings'
 
@@ -37,47 +51,103 @@ BASE_PACKAGES = [
     'apache2',
     'python-keystone',
 ]
+# > Folsom specific packages
+FOLSOM_PACKAGES = BASE_PACKAGES + ['swift-plugin-s3']
 
 SWIFT_HA_RES = 'res_swift_vip'
 
-# Folsom-specific packages
-FOLSOM_PACKAGES = BASE_PACKAGES + ['swift-plugin-s3']
+TEMPLATES = 'templates/'
+
+# Map config files to hook contexts and services that will be associated
+# with file in restart_on_changes()'s service map.
+CONFIG_FILES = OrderedDict([
+    (SWIFT_CONF, {
+        'hook_contexts': [swift_context.SwiftHashContext()],
+        'services': ['swift-proxy'],
+    }),
+    (SWIFT_PROXY_CONF, {
+        'hook_contexts': [swift_context.SwiftIdentityContext()],
+        'services': ['swift-proxy'],
+    }),
+    (HAPROXY_CONF, {
+        'hook_contexts': [context.HAProxyContext(),
+                          swift_context.HAProxyContext()],
+        'services': ['haproxy'],
+    }),
+    (SWIFT_RINGS_CONF, {
+        'hook_contexts': [swift_context.SwiftRingContext()],
+        'services': ['apache2'],
+    }),
+    (SWIFT_RINGS_24_CONF, {
+        'hook_contexts': [swift_context.SwiftRingContext()],
+        'services': ['apache2'],
+    }),
+    (APACHE_SITE_CONF, {
+        'hook_contexts': [swift_context.ApacheSSLContext()],
+        'services': ['apache2'],
+    }),
+    (APACHE_SITE_24_CONF, {
+        'hook_contexts': [swift_context.ApacheSSLContext()],
+        'services': ['apache2'],
+    }),
+    (MEMCACHED_CONF, {
+        'hook_contexts': [swift_context.MemcachedContext()],
+        'services': ['memcached'],
+    }),
+])
 
 
-def proxy_control(action):
-    '''utility to work around swift-init's bad RCs.'''
-    def _cmd(action):
-        return ['swift-init', 'proxy-server', action]
+def register_configs():
+    """
+    Register config files with their respective contexts.
+    Regstration of some configs may not be required depending on
+    existing of certain relations.
+    """
+    # if called without anything installed (eg during install hook)
+    # just default to earliest supported release. configs dont get touched
+    # till post-install, anyway.
+    release = openstack.get_os_codename_package('swift-proxy', fatal=False) \
+        or 'essex'
+    configs = templating.OSConfigRenderer(templates_dir=TEMPLATES,
+                                          openstack_release=release)
 
-    p = subprocess.Popen(_cmd('status'), stdout=subprocess.PIPE)
-    p.communicate()
-    status = p.returncode
-    if action == 'stop':
-        if status == 1:
-            return
-        elif status == 0:
-            return subprocess.check_call(_cmd('stop'))
+    confs = [SWIFT_CONF,
+             SWIFT_PROXY_CONF,
+             HAPROXY_CONF,
+             MEMCACHED_CONF]
 
-    # the proxy will not start unless there are balanced rings
-    # gzip'd in /etc/swift
-    missing = False
-    for k in SWIFT_RINGS.keys():
-        if not os.path.exists(os.path.join(SWIFT_CONF_DIR, '%s.ring.gz' % k)):
-            missing = True
-    if missing:
-        utils.juju_log('INFO', 'Rings not balanced, skipping %s.' % action)
-        return
+    for conf in confs:
+        configs.register(conf, CONFIG_FILES[conf]['hook_contexts'])
 
-    if action == 'start':
-        if status == 0:
-            return
-        elif status == 1:
-            return subprocess.check_call(_cmd('start'))
-    elif action == 'restart':
-        if status == 0:
-            return subprocess.check_call(_cmd('restart'))
-        elif status == 1:
-            return subprocess.check_call(_cmd('start'))
+    if os.path.exists('/etc/apache2/conf-available'):
+        configs.register(SWIFT_RINGS_24_CONF,
+                         CONFIG_FILES[SWIFT_RINGS_24_CONF]['hook_contexts'])
+        configs.register(APACHE_SITE_24_CONF,
+                         CONFIG_FILES[APACHE_SITE_24_CONF]['hook_contexts'])
+    else:
+        configs.register(SWIFT_RINGS_CONF,
+                         CONFIG_FILES[SWIFT_RINGS_CONF]['hook_contexts'])
+        configs.register(APACHE_SITE_CONF,
+                         CONFIG_FILES[APACHE_SITE_CONF]['hook_contexts'])
+    return configs
+
+
+def restart_map():
+    '''
+    Determine the correct resource map to be passed to
+    charmhelpers.core.restart_on_change() based on the services configured.
+
+    :returns: dict: A dictionary mapping config file to lists of services
+                    that should be restarted when file changes.
+    '''
+    _map = []
+    for f, ctxt in CONFIG_FILES.iteritems():
+        svcs = []
+        for svc in ctxt['services']:
+            svcs.append(svc)
+        if svcs:
+            _map.append((f, svcs))
+    return OrderedDict(_map)
 
 
 def swift_user(username='swift'):
@@ -100,119 +170,15 @@ def determine_packages(release):
         return FOLSOM_PACKAGES
     elif release == 'grizzly':
         return FOLSOM_PACKAGES
-
-
-def render_config(config_file, context):
-    '''write out config using templates for a specific openstack release.'''
-    os_release = openstack.get_os_codename_package('python-swift')
-    # load os release-specific templates.
-    cfile = os.path.basename(config_file)
-    templates_dir = os.path.join(utils.TEMPLATES_DIR, os_release)
-    context['os_release'] = os_release
-    return utils.render_template(cfile, context, templates_dir)
-
-
-def get_swift_hash():
-    if os.path.isfile(SWIFT_HASH_FILE):
-        with open(SWIFT_HASH_FILE, 'r') as hashfile:
-            swift_hash = hashfile.read().strip()
-    elif utils.config_get('swift-hash'):
-        swift_hash = utils.config_get('swift-hash')
-        with open(SWIFT_HASH_FILE, 'w') as hashfile:
-            hashfile.write(swift_hash)
     else:
-        cmd = ['od', '-t', 'x8', '-N', '8', '-A', 'n']
-        rand = open('/dev/random', 'r')
-        p = subprocess.Popen(cmd, stdout=subprocess.PIPE, stdin=rand)
-        swift_hash = p.communicate()[0].strip()
-        with open(SWIFT_HASH_FILE, 'w') as hashfile:
-            hashfile.write(swift_hash)
-    return swift_hash
+        return FOLSOM_PACKAGES
 
 
-def get_keystone_auth():
-    '''return standard keystone auth credentials, either from config or the
-       identity-service relation.  user-specified config is given priority
-       over an existing relation.
-    '''
-    auth_type = utils.config_get('auth-type')
-    auth_host = utils.config_get('keystone-auth-host')
-    admin_user = utils.config_get('keystone-admin-user')
-    admin_password = utils.config_get('keystone-admin-user')
-    if (auth_type == 'keystone' and auth_host
-        and admin_user and admin_password):
-        utils.juju_log('INFO', 'Using user-specified Keystone configuration.')
-        ks_auth = {
-            'auth_type': 'keystone',
-            'auth_protocol': utils.config_get('keystone-auth-protocol'),
-            'keystone_host': auth_host,
-            'auth_port': utils.config_get('keystone-auth-port'),
-            'service_user': admin_user,
-            'service_password': admin_password,
-            'service_tenant': utils.config_get('keystone-admin-tenant-name')
-        }
-        return ks_auth
-
-    for relid in utils.relation_ids('identity-service'):
-        utils.juju_log('INFO',
-                       'Using Keystone configuration from identity-service.')
-        for unit in utils.relation_list(relid):
-            ks_auth = {
-                'auth_type': 'keystone',
-                'auth_protocol': 'http',
-                'keystone_host': utils.relation_get('auth_host',
-                                                    unit, relid),
-                'auth_port': utils.relation_get('auth_port', unit, relid),
-                'service_user': utils.relation_get('service_username',
-                                                   unit, relid),
-                'service_password': utils.relation_get('service_password',
-                                                       unit, relid),
-                'service_tenant': utils.relation_get('service_tenant',
-                                                     unit, relid),
-                'service_port': utils.relation_get('service_port',
-                                                   unit, relid),
-                'admin_token': utils.relation_get('admin_token',
-                                                  unit, relid),
-            }
-            if None not in ks_auth.itervalues():
-                return ks_auth
-    return None
-
-
-def write_proxy_config():
-
-    bind_port = utils.config_get('bind-port')
-    workers = utils.config_get('workers')
-    if workers == '0':
-        import multiprocessing
-        workers = multiprocessing.cpu_count()
-
+def write_rc_script():
     env_vars = {'OPENSTACK_SERVICE_SWIFT': 'proxy-server',
-                'OPENSTACK_PORT_API': bind_port,
+                'OPENSTACK_PORT_API': config('bind-port'),
                 'OPENSTACK_PORT_MEMCACHED': 11211}
     openstack.save_script_rc(**env_vars)
-
-    ctxt = {
-        'proxy_ip': utils.get_host_ip(),
-        'bind_port': cluster.determine_api_port(bind_port),
-        'workers': workers,
-        'operator_roles': utils.config_get('operator-roles'),
-        'delay_auth_decision': utils.config_get('delay-auth-decision')
-    }
-
-    ctxt['ssl'] = False
-
-    ks_auth = get_keystone_auth()
-    if ks_auth:
-        utils.juju_log('INFO', 'Enabling Keystone authentication.')
-        for k, v in ks_auth.iteritems():
-            ctxt[k] = v
-
-    with open(SWIFT_PROXY_CONF, 'w') as conf:
-        conf.write(render_config(SWIFT_PROXY_CONF, ctxt))
-
-    proxy_control('restart')
-    subprocess.check_call(['open-port', str(bind_port)])
 
 
 def _load_builder(path):
@@ -263,7 +229,7 @@ def exists_in_ring(ring_path, node):
         if sorted(d) == sorted(n):
 
             msg = 'Node already exists in ring (%s).' % ring_path
-            utils.juju_log('INFO', msg)
+            log(msg)
             return True
 
     return False
@@ -290,9 +256,9 @@ def add_to_ring(ring_path, node):
     ring.add_dev(new_dev)
     _write_ring(ring, ring_path)
     msg = 'Added new device to ring %s: %s' %\
-         (ring_path,
-          [k for k in new_dev.iteritems()])
-    utils.juju_log('INFO', msg)
+        (ring_path,
+         [k for k in new_dev.iteritems()])
+    log(msg)
 
 
 def _get_zone(ring_builder):
@@ -328,7 +294,7 @@ def get_zone(assignment_policy):
         being assigned to a different zone.
     '''
     if assignment_policy == 'manual':
-        return utils.relation_get('zone')
+        return relation_get('zone')
     elif assignment_policy == 'auto':
         potential_zones = []
         for ring in SWIFT_RINGS.itervalues():
@@ -336,8 +302,8 @@ def get_zone(assignment_policy):
             potential_zones.append(_get_zone(builder))
         return set(potential_zones).pop()
     else:
-        utils.juju_log('ERROR', 'Invalid zone assignment policy: %s' %\
-                       assignment_policy)
+        log('Invalid zone assignment policy: %s' % assignment_policy,
+            level=ERROR)
         sys.exit(1)
 
 
@@ -355,7 +321,7 @@ def balance_ring(ring_path):
         # swift-ring-builder returns 1 on WARNING (ring didn't require balance)
         return False
     else:
-        utils.juju_log('ERROR', 'balance_ring: %s returned %s' % (cmd, rc))
+        log('balance_ring: %s returned %s' % (cmd, rc), level=ERROR)
         sys.exit(1)
 
 
@@ -373,88 +339,9 @@ def should_balance(rings):
     return do_rebalance
 
 
-def write_apache_config():
-    '''write out /etc/apache2/conf.d/swift-rings with a list of authenticated
-       hosts'''
-    utils.juju_log('INFO', 'Updating %s.' % APACHE_CONF)
-
-    allowed_hosts = []
-    for relid in utils.relation_ids('swift-storage'):
-        for unit in utils.relation_list(relid):
-            host = utils.relation_get('private-address', unit, relid)
-            allowed_hosts.append(utils.get_host_ip(host))
-
-    ctxt = {
-        'www_dir': WWW_DIR,
-        'allowed_hosts': allowed_hosts
-        }
-    with open(APACHE_CONF, 'w') as conf:
-        conf.write(render_config(APACHE_CONF, ctxt))
-    utils.reload('apache2')
-
-
-def generate_cert():
-    '''
-    Generates a self signed certificate and key using the
-    provided charm configuration data.
-
-    returns: tuple of (cert, key)
-    '''
-    CERT = '/etc/swift/ssl.cert'
-    KEY = '/etc/swift/ssl.key'
-    if (not os.path.exists(CERT) and
-        not os.path.exists(KEY)):
-        subj = '/C=%s/ST=%s/L=%s/CN=%s' %\
-            (utils.config_get('country'), utils.config_get('state'),
-             utils.config_get('locale'), utils.config_get('common-name'))
-        cmd = ['openssl', 'req', '-new', '-x509', '-nodes',
-               '-out', CERT, '-keyout', KEY,
-               '-subj', subj]
-        subprocess.check_call(cmd)
-        os.chmod(KEY, 0600)
-    # Slurp as base64 encoded - makes handling easier up the stack
-    with open(CERT, 'r') as cfile:
-        ssl_cert = b64encode(cfile.read())
-    with open(KEY, 'r') as kfile:
-        ssl_key = b64encode(kfile.read())
-    return (ssl_cert, ssl_key)
-
-
-def configure_haproxy():
-    api_port = utils.config_get('bind-port')
-    service_ports = {
-        "swift": [
-            cluster.determine_haproxy_port(api_port),
-            cluster.determine_api_port(api_port)
-            ]
-        }
-    write_proxy_config()
-    haproxy.configure_haproxy(service_ports)
-
-
-def configure_https():
-    if cluster.https():
-        api_port = utils.config_get('bind-port')
-        if (len(cluster.peer_units()) > 0 or
-            cluster.is_clustered()):
-            target_port = cluster.determine_haproxy_port(api_port)
-            configure_haproxy()
-        else:
-            target_port = cluster.determine_api_port(api_port)
-            write_proxy_config()
-        cert, key = apache.get_cert()
-        if None in (cert, key):
-            cert, key = generate_cert()
-        ca_cert = apache.get_ca_cert()
-        apache.setup_https(namespace="swift",
-                           port_maps={api_port: target_port},
-                           cert=cert, key=key, ca_cert=ca_cert)
-
-
 def do_openstack_upgrade(source, packages):
     openstack.configure_installation_source(source)
-    os.environ['DEBIAN_FRONTEND'] = 'noninteractive'
-    subprocess.check_call(['apt-get', 'update'])
-    cmd = ['apt-get', '--option', 'Dpkg::Options::=--force-confnew', '-y',
-           'install'] + packages
-    subprocess.check_call(cmd)
+    apt_update(fatal=True)
+    apt_install(options=['--option', 'Dpkg::Options::=--force-confnew'],
+                packages=packages,
+                fatal=True)
