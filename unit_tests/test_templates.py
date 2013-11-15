@@ -48,7 +48,11 @@ class ProxyServerTemplateTestCase(unittest.TestCase):
         for release in ('essex', 'grizzly', 'havana'):
             template = self.get_template_for_release(release)
             with open(template.filename, 'r') as template_orig:
-                self.assertNotIn('os_release', template_orig.read())
+                self.assertNotIn(
+                    'os_release', template_orig.read(),
+                    "The template '{}' contains os_release which is "
+                    "no longer provided in the context.".format(
+                        template.filename))
 
     def test_config_renders_for_all_releases(self):
         """The configs render without syntax error."""
