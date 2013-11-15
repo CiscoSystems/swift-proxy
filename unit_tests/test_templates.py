@@ -9,7 +9,7 @@ class ProxyServerTemplateTestCase(unittest.TestCase):
 
     @mock.patch('charmhelpers.contrib.openstack.templating.log')
     def get_template_for_release(self, os_release, mock_log):
-        loader = get_loader('./templates', 'essex')
+        loader = get_loader('./templates', os_release)
         env = Environment(loader=loader)
 
         return env.get_template('proxy-server.conf')
@@ -39,3 +39,22 @@ class ProxyServerTemplateTestCase(unittest.TestCase):
                                  delay_auth_decision='anything')
 
         self.assertIn("delay_auth_decision = 0", result)
+
+    def test_os_release_not_in_templates(self):
+        """Regression test for bug 1251551.
+
+        The os_release is no longer provided as context to the templates.
+        """
+        for release in ('essex', 'grizzly', 'havana'):
+            template = self.get_template_for_release(release)
+            with open(template.filename, 'r') as template_orig:
+                self.assertNotIn('os_release', template_orig.read())
+
+    def test_config_renders_for_all_releases(self):
+        """The configs render without syntax error."""
+        for release in ('essex', 'grizzly', 'havana'):
+            template = self.get_template_for_release(release)
+
+            result = template.render()
+
+            self.assertTrue(result.startswith("[DEFAULT]"))
