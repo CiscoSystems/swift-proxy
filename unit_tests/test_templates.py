@@ -21,3 +21,21 @@ class ProxyServerTemplateTestCase(unittest.TestCase):
         result = template.render(auth_type='keystone')
 
         self.assertIn("use = egg:swift#swift3", result)
+
+    def test_essex_keystone_includes_correct_delay_auth_true(self):
+        """Regression test for bug 1251551."""
+        template = self.get_template_for_release('essex')
+
+        result = template.render(auth_type='keystone',
+                                 delay_auth_decision='true')
+
+        self.assertIn("delay_auth_decision = 1", result)
+
+    def test_essex_keystone_includes_correct_delay_auth_false(self):
+        """Regression test for bug 1251551."""
+        template = self.get_template_for_release('essex')
+
+        result = template.render(auth_type='keystone',
+                                 delay_auth_decision='anything')
+
+        self.assertIn("delay_auth_decision = 0", result)
