@@ -1,0 +1,7 @@
+To run the basic unit tests you'll need to:
+
+  sudo apt-get install python-mock python-nose python-jinja2
+
+then run with:
+
+  PYTHONPATH=./hooks nosetests unit_tests
