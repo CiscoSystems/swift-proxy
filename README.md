@@ -46,13 +46,13 @@ this charm, a deployment would look something like:
             replicas: 3
         swift-storage-zone1:
             zone: 1
-            block-device: sdb
+            block-device: /etc/swift/storage.img|2G
         swift-storage-zone2:
             zone: 2
-            block-device: sdb
+            block-device: /etc/swift/storage.img|2G
         swift-storage-zone3:
             zone: 3
-            block-device: sdb
+            block-device: /etc/swift/storage.img|2G
     END
     $ juju deploy --config=swift.cfg swift-proxy
     $ juju deploy --config=swift.cfg swift-storage swift-storage-zone1
@@ -82,7 +82,7 @@ assigned to that service unit will be distributed evenly across zones.
         replicas: 3
     swift-storage:
         zone: 1
-        block-device: sdb
+        block-device: /etc/swift/storage.img|2G
     END
     $ juju deploy --config=swift.cfg swift-proxy
     $ juju deploy --config=swift.cfg swift-storage

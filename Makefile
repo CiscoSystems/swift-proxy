@@ -3,7 +3,7 @@ PYTHON := /usr/bin/env python
 
 lint:
 	@flake8 --exclude hooks/charmhelpers --ignore=E125 hooks
-	#@flake8 --exclude hooks/charmhelpers --ignore=E125 unit_tests
+	@flake8 --exclude hooks/charmhelpers --ignore=E125 unit_tests
 	@charm proof
 
 test:
